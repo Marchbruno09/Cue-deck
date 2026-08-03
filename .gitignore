@@ -1,0 +1,10 @@
+# 忽略所有依赖包
+node_modules/
+
+# 忽略打包输出目录 (如果你还有 dist 目录也可以加上 dist/)
+release/
+
+# 忽略 macOS 编译好的应用程序包
+*.app# 忽略 macOS 应用程序包
+*.app
+# 忽略常见的构建输出目录

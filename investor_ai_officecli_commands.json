@@ -1,0 +1,813 @@
+[
+  {
+    "command": "set",
+    "path": "/",
+    "props": {
+      "slideSize": "widescreen",
+      "title": "Investor AI gives PE leaders a second, evidence-based investment view",
+      "subject": "Investor AI investment journey",
+      "author": "OpenAI Codex",
+      "theme.font.major.latin": "Arial",
+      "theme.font.minor.latin": "Arial",
+      "theme.color.dk1": "#18342A",
+      "theme.color.lt1": "#FFFFFF",
+      "theme.color.accent1": "#145849",
+      "theme.color.accent2": "#5F7A70"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/",
+    "type": "slide",
+    "props": {
+      "background": "#FFFFFF"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Title",
+      "text": "Investor AI gives PE leaders a second, evidence-based investment view",
+      "x": "1.4cm",
+      "y": "0.68cm",
+      "width": "31.0cm",
+      "height": "1.25cm",
+      "font": "Arial",
+      "size": "25pt",
+      "bold": "true",
+      "color": "#15392E",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0",
+      "autoFit": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Title rule",
+      "geometry": "rect",
+      "x": "1.4cm",
+      "y": "2.08cm",
+      "width": "31.0cm",
+      "height": "0.04cm",
+      "fill": "#145849",
+      "line": "none"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 1 card",
+      "geometry": "roundRect",
+      "x": "1.4cm",
+      "y": "4.50cm",
+      "width": "9.85cm",
+      "height": "10.85cm",
+      "fill": "#F6F8F7",
+      "line": "#DCE5E1:0.8"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 2 card",
+      "geometry": "roundRect",
+      "x": "12.01cm",
+      "y": "4.50cm",
+      "width": "9.85cm",
+      "height": "10.85cm",
+      "fill": "#F6F8F7",
+      "line": "#DCE5E1:0.8"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 3 card",
+      "geometry": "roundRect",
+      "x": "22.62cm",
+      "y": "4.50cm",
+      "width": "9.85cm",
+      "height": "10.85cm",
+      "fill": "#F6F8F7",
+      "line": "#DCE5E1:0.8"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "connector",
+    "props": {
+      "name": "Journey rail",
+      "shape": "straight",
+      "x": "6.30cm",
+      "y": "3.61cm",
+      "width": "21.30cm",
+      "height": "0.01cm",
+      "color": "#9DB9AE",
+      "lineWidth": "1.5pt",
+      "tailEnd": "triangle",
+      "zorder": "4"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 1 label",
+      "text": "DEAL DILIGENCE",
+      "x": "1.4cm",
+      "y": "2.48cm",
+      "width": "9.85cm",
+      "height": "0.60cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#5F756C",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 2 label",
+      "text": "INVESTMENT COMMITTEE",
+      "x": "12.01cm",
+      "y": "2.48cm",
+      "width": "9.85cm",
+      "height": "0.60cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#5F756C",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 3 label",
+      "text": "OWNERSHIP & EXIT",
+      "x": "22.62cm",
+      "y": "2.48cm",
+      "width": "9.85cm",
+      "height": "0.60cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#5F756C",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 1 number",
+      "geometry": "ellipse",
+      "text": "01",
+      "x": "5.82cm",
+      "y": "3.06cm",
+      "width": "1.10cm",
+      "height": "1.10cm",
+      "fill": "#145849",
+      "line": "none",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#FFFFFF",
+      "align": "center",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 2 number",
+      "geometry": "ellipse",
+      "text": "02",
+      "x": "16.43cm",
+      "y": "3.06cm",
+      "width": "1.10cm",
+      "height": "1.10cm",
+      "fill": "#145849",
+      "line": "none",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#FFFFFF",
+      "align": "center",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 3 number",
+      "geometry": "ellipse",
+      "text": "03",
+      "x": "27.04cm",
+      "y": "3.06cm",
+      "width": "1.10cm",
+      "height": "1.10cm",
+      "fill": "#145849",
+      "line": "none",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#FFFFFF",
+      "align": "center",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Evidence icon document",
+      "geometry": "rect",
+      "x": "1.98cm",
+      "y": "5.07cm",
+      "width": "0.70cm",
+      "height": "0.86cm",
+      "fill": "none",
+      "line": "#145849:1.2"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "connector",
+    "props": {
+      "name": "Evidence icon line 1",
+      "shape": "straight",
+      "x": "2.12cm",
+      "y": "5.36cm",
+      "width": "0.40cm",
+      "height": "0.01cm",
+      "color": "#145849",
+      "lineWidth": "1pt"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "connector",
+    "props": {
+      "name": "Evidence icon line 2",
+      "shape": "straight",
+      "x": "2.12cm",
+      "y": "5.58cm",
+      "width": "0.32cm",
+      "height": "0.01cm",
+      "color": "#145849",
+      "lineWidth": "1pt"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Decision icon diamond",
+      "geometry": "diamond",
+      "x": "12.56cm",
+      "y": "5.10cm",
+      "width": "0.78cm",
+      "height": "0.78cm",
+      "fill": "none",
+      "line": "#145849:1.2"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Decision icon centre",
+      "geometry": "ellipse",
+      "x": "12.84cm",
+      "y": "5.38cm",
+      "width": "0.22cm",
+      "height": "0.22cm",
+      "fill": "#145849",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Exit icon arrow",
+      "geometry": "rightArrow",
+      "x": "23.12cm",
+      "y": "5.27cm",
+      "width": "0.86cm",
+      "height": "0.42cm",
+      "rotation": "-24",
+      "fill": "#145849",
+      "line": "none"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 1 title",
+      "text": "Validate the Evidence",
+      "x": "2.95cm",
+      "y": "4.86cm",
+      "width": "7.70cm",
+      "height": "1.18cm",
+      "font": "Arial",
+      "size": "15pt",
+      "bold": "true",
+      "color": "#15392E",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 2 title",
+      "text": "Challenge the Decision",
+      "x": "13.56cm",
+      "y": "4.86cm",
+      "width": "7.70cm",
+      "height": "1.18cm",
+      "font": "Arial",
+      "size": "15pt",
+      "bold": "true",
+      "color": "#15392E",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 3 title",
+      "text": "Monitor the Thesis\nand Exit",
+      "x": "24.17cm",
+      "y": "4.76cm",
+      "width": "7.70cm",
+      "height": "1.38cm",
+      "font": "Arial",
+      "size": "15pt",
+      "bold": "true",
+      "color": "#15392E",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 1 question",
+      "text": "Can we trust the case?",
+      "x": "2.02cm",
+      "y": "6.55cm",
+      "width": "8.62cm",
+      "height": "1.24cm",
+      "font": "Arial",
+      "size": "14pt",
+      "bold": "true",
+      "color": "#2A3E36",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 2 question",
+      "text": "What might we be missing?",
+      "x": "12.63cm",
+      "y": "6.55cm",
+      "width": "8.62cm",
+      "height": "1.24cm",
+      "font": "Arial",
+      "size": "14pt",
+      "bold": "true",
+      "color": "#2A3E36",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Stage 3 question",
+      "text": "Has the risk-return\nprofile changed?",
+      "x": "23.24cm",
+      "y": "6.43cm",
+      "width": "8.62cm",
+      "height": "1.50cm",
+      "font": "Arial",
+      "size": "14pt",
+      "bold": "true",
+      "color": "#2A3E36",
+      "fill": "none",
+      "align": "left",
+      "valign": "center",
+      "margin": "0"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 1 divider",
+      "geometry": "rect",
+      "x": "2.02cm",
+      "y": "8.15cm",
+      "width": "8.62cm",
+      "height": "0.03cm",
+      "fill": "#B9CBC4",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 2 divider",
+      "geometry": "rect",
+      "x": "12.63cm",
+      "y": "8.15cm",
+      "width": "8.62cm",
+      "height": "0.03cm",
+      "fill": "#B9CBC4",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 3 divider",
+      "geometry": "rect",
+      "x": "23.24cm",
+      "y": "8.15cm",
+      "width": "8.62cm",
+      "height": "0.03cm",
+      "fill": "#B9CBC4",
+      "line": "none"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 1 activities",
+      "geometry": "rect",
+      "text": "• Cross-check reports\n• Identify conflicts\n• Find evidence gaps",
+      "x": "2.02cm",
+      "y": "8.63cm",
+      "width": "8.62cm",
+      "height": "3.35cm",
+      "font": "Arial",
+      "size": "12pt",
+      "color": "#334B41",
+      "fill": "none",
+      "line": "none",
+      "align": "left",
+      "valign": "top",
+      "margin": "0.05cm",
+      "lineSpacing": "1.55x"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 2 activities",
+      "geometry": "rect",
+      "text": "• Investment thesis analysis\n• Valuation and fundamentals\n• Scenario stress-testing",
+      "x": "12.63cm",
+      "y": "8.63cm",
+      "width": "8.62cm",
+      "height": "3.35cm",
+      "font": "Arial",
+      "size": "12pt",
+      "color": "#334B41",
+      "fill": "none",
+      "line": "none",
+      "align": "left",
+      "valign": "top",
+      "margin": "0.05cm",
+      "lineSpacing": "1.55x"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 3 activities",
+      "geometry": "rect",
+      "text": "• Performance monitoring\n• Thesis vs. actuals\n• Hold / exit scenarios",
+      "x": "23.24cm",
+      "y": "8.63cm",
+      "width": "8.62cm",
+      "height": "3.35cm",
+      "font": "Arial",
+      "size": "12pt",
+      "color": "#334B41",
+      "fill": "none",
+      "line": "none",
+      "align": "left",
+      "valign": "top",
+      "margin": "0.05cm",
+      "lineSpacing": "1.55x"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 1 outcome",
+      "geometry": "roundRect",
+      "text": "RELIABLE FACT BASE",
+      "x": "1.92cm",
+      "y": "13.70cm",
+      "width": "8.81cm",
+      "height": "1.16cm",
+      "fill": "#E2EEE9",
+      "line": "none",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#145849",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.10cm"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 2 outcome",
+      "geometry": "roundRect",
+      "text": "STRONGER CONVICTION",
+      "x": "12.53cm",
+      "y": "13.70cm",
+      "width": "8.81cm",
+      "height": "1.16cm",
+      "fill": "#E2EEE9",
+      "line": "none",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#145849",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.10cm"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Stage 3 outcome",
+      "geometry": "roundRect",
+      "text": "EARLIER EXIT SIGNALS",
+      "x": "23.14cm",
+      "y": "13.70cm",
+      "width": "8.81cm",
+      "height": "1.16cm",
+      "fill": "#E2EEE9",
+      "line": "none",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#145849",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.10cm"
+    }
+  },
+
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Capability foundation",
+      "geometry": "roundRect",
+      "x": "1.4cm",
+      "y": "16.20cm",
+      "width": "31.07cm",
+      "height": "1.58cm",
+      "fill": "#145849",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Capability 1",
+      "text": "Document Intelligence & Extraction",
+      "x": "1.72cm",
+      "y": "16.48cm",
+      "width": "8.55cm",
+      "height": "1.02cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "false",
+      "color": "#FFFFFF",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.05cm"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Capability separator 1",
+      "geometry": "rect",
+      "x": "10.37cm",
+      "y": "16.55cm",
+      "width": "0.025cm",
+      "height": "0.88cm",
+      "fill": "#84A89A",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Capability 2",
+      "text": "Cross-validation",
+      "x": "10.57cm",
+      "y": "16.48cm",
+      "width": "6.10cm",
+      "height": "1.02cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "false",
+      "color": "#FFFFFF",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.05cm"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Capability separator 2",
+      "geometry": "rect",
+      "x": "16.77cm",
+      "y": "16.55cm",
+      "width": "0.025cm",
+      "height": "0.88cm",
+      "fill": "#84A89A",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Capability 3",
+      "text": "Fundamental Analysis",
+      "x": "16.97cm",
+      "y": "16.48cm",
+      "width": "7.10cm",
+      "height": "1.02cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "true",
+      "color": "#FFFFFF",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.05cm"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "shape",
+    "props": {
+      "name": "Capability separator 3",
+      "geometry": "rect",
+      "x": "24.17cm",
+      "y": "16.55cm",
+      "width": "0.025cm",
+      "height": "0.88cm",
+      "fill": "#84A89A",
+      "line": "none"
+    }
+  },
+  {
+    "command": "add",
+    "parent": "/slide[1]",
+    "type": "textbox",
+    "props": {
+      "name": "Capability 4",
+      "text": "Scenario Modelling",
+      "x": "24.37cm",
+      "y": "16.48cm",
+      "width": "7.78cm",
+      "height": "1.02cm",
+      "font": "Arial",
+      "size": "12pt",
+      "bold": "false",
+      "color": "#FFFFFF",
+      "fill": "none",
+      "align": "center",
+      "valign": "center",
+      "margin": "0.05cm"
+    }
+  }
+]

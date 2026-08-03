@@ -1,0 +1,67 @@
+{
+  "name": "cue-deck",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private presenter notes synchronized with local HTML slide decks.",
+  "main": "dist-electron/main.js",
+  "scripts": {
+    "dev": "electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache node ./node_modules/vite/bin/vite.js",
+    "build": "node ./node_modules/typescript/bin/tsc -b && node ./node_modules/vite/bin/vite.js build",
+    "test": "node ./node_modules/vitest/vitest.mjs run",
+    "test:watch": "node ./node_modules/vitest/vitest.mjs",
+    "pack": "npm run build && electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_BUILDER_CACHE=${TMPDIR:-/tmp}/cue-deck-builder-cache node ./node_modules/electron-builder/cli.js --mac dir",
+    "dist": "npm run build && electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_BUILDER_CACHE=${TMPDIR:-/tmp}/cue-deck-builder-cache node ./node_modules/electron-builder/cli.js --mac zip"
+  },
+  "dependencies": {
+    "lucide-react": "0.468.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "react-markdown": "10.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.30",
+    "@types/react": "19.1.8",
+    "@types/react-dom": "19.1.6",
+    "@types/jsdom": "28.0.3",
+    "@vitejs/plugin-react": "5.0.4",
+    "electron": "41.7.1",
+    "electron-builder": "26.15.3",
+    "jsdom": "26.1.0",
+    "typescript": "5.9.3",
+    "vite": "7.3.6",
+    "vite-plugin-electron": "0.29.0",
+    "vite-plugin-electron-renderer": "0.14.6",
+    "vitest": "3.2.7"
+  },
+  "build": {
+    "appId": "com.cuedeck.presenter",
+    "productName": "CueDeck",
+    "asar": true,
+    "npmRebuild": false,
+    "electronDownload": {
+      "cache": "/private/tmp/cue-deck-electron-cache"
+    },
+    "files": [
+      "dist/**/*",
+      "dist-electron/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        {
+          "target": "dir",
+          "arch": ["arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["arm64"]
+        }
+      ],
+      "identity": null
+    },
+    "directories": {
+      "output": "release"
+    }
+  }
+}

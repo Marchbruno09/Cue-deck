@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <title>CueDeck Frontend Slides Fixture</title>
+  <style>
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; font-family: sans-serif; }
+    .slide { position: absolute; inset: 0; display: grid; place-items: center; visibility: hidden; background: #f5f7f8; color: #145849; }
+    .slide.active { visibility: visible; }
+    .fragment { opacity: 0; }
+    .fragment.visible { opacity: 1; }
+  </style>
+</head>
+<body>
+  <section class="slide active"><h1>Opening</h1><p class="fragment">Progressive detail</p></section>
+  <section class="slide"><h1>Evidence</h1></section>
+  <section class="slide"><h1>Next step</h1></section>
+  <script>
+    const slides = [...document.querySelectorAll('.slide')];
+    const fragment = document.querySelector('.fragment');
+    let index = 0;
+    addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight') {
+        if (index === 0 && !fragment.classList.contains('visible')) {
+          fragment.classList.add('visible');
+          return;
+        }
+        slides[index].classList.remove('active');
+        index = Math.min(slides.length - 1, index + 1);
+        slides[index].classList.add('active');
+      }
+      if (event.key === 'ArrowLeft') {
+        slides[index].classList.remove('active');
+        index = Math.max(0, index - 1);
+        slides[index].classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>

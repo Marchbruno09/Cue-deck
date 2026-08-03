@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CueDeck 演示样例</title>
+  <style>
+    html, body { width: 100%; height: 100%; margin: 0; overflow: hidden; background: #f5f7f8; font-family: Arial, sans-serif; }
+    .slide { position: absolute; inset: 0; display: grid; place-items: center; visibility: hidden; opacity: 0; color: #145849; transition: opacity 240ms ease; }
+    .slide.active { visibility: visible; opacity: 1; }
+    .slide div { max-width: 900px; padding: 80px; }
+    h1 { margin: 0; font-size: 72px; line-height: 1.08; }
+    p { font-size: 28px; line-height: 1.5; color: #46544f; }
+    .fragment { opacity: 0; transform: translateY(14px); transition: 200ms ease; }
+    .fragment.visible { opacity: 1; transform: translateY(0); }
+  </style>
+</head>
+<body>
+  <section class="slide active"><div><h1>从决策开始</h1><p>让每一步都服务于客户要做出的判断。</p><p class="fragment">这一行是页内逐步动画。</p></div></section>
+  <section class="slide"><div><h1>组织证据</h1><p>区分事实、推断、建议和待确认事项。</p></div></section>
+  <section class="slide"><div><h1>明确下一步</h1><p>连接 owner、时间、输出和审批门。</p></div></section>
+  <script>
+    const slides = Array.from(document.querySelectorAll('.slide'));
+    const fragment = document.querySelector('.fragment');
+    let index = 0;
+    addEventListener('keydown', (event) => {
+      if (event.key === 'ArrowRight') {
+        if (index === 0 && !fragment.classList.contains('visible')) {
+          fragment.classList.add('visible');
+          return;
+        }
+        slides[index].classList.remove('active');
+        index = Math.min(slides.length - 1, index + 1);
+        slides[index].classList.add('active');
+      }
+      if (event.key === 'ArrowLeft') {
+        slides[index].classList.remove('active');
+        index = Math.max(0, index - 1);
+        slides[index].classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>
