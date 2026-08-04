@@ -9,8 +9,10 @@ import {
   FileText,
   FolderOpen,
   GripVertical,
+  Image as ImageIcon,
   Import,
   Lock,
+  LoaderCircle,
   Minus,
   MonitorPlay,
   Pencil,
@@ -22,7 +24,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { createEmptyNote } from "./lib/notes";
-import type { AdapterKind, AppState, SlideNote } from "./types";
+import type { AdapterKind, AppState, SlideNote, SlideThumbnail } from "./types";
 
 const emptyState: AppState = {
   deckPath: null,
@@ -92,7 +94,10 @@ function SetupView({ state }: { state: AppState }) {
   const [draftNotes, setDraftNotes] = useState<SlideNote[]>(state.notes);
   const [selectedIndex, setSelectedIndex] = useState(state.currentIndex);
   const [busy, setBusy] = useState<string | null>(null);
+  const [thumbnail, setThumbnail] = useState<SlideThumbnail | null>(null);
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
   const saveTimer = useRef<number | null>(null);
+  const thumbnailRequest = useRef(0);
   const selectedRowRef = useRef<HTMLButtonElement | null>(null);
 
   useEffect(() => {
@@ -150,6 +155,29 @@ function SetupView({ state }: { state: AppState }) {
   useEffect(() => {
     selectedRowRef.current?.scrollIntoView({ block: "nearest" });
   }, [selectedIndex, rowCount]);
+
+  useEffect(() => {
+    const requestId = ++thumbnailRequest.current;
+    let cancelled = false;
+    setThumbnail(null);
+    setThumbnailLoading(true);
+    void window.cueDeck.getSlideThumbnail(selectedIndex).then((result) => {
+      if (cancelled || thumbnailRequest.current !== requestId) return;
+      setThumbnail(result);
+      setThumbnailLoading(false);
+    }).catch(() => {
+      if (cancelled || thumbnailRequest.current !== requestId) return;
+      setThumbnail({
+        index: selectedIndex,
+        status: "error",
+        message: "缩略图生成失败",
+      });
+      setThumbnailLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedIndex, state.adapterRecognized, state.deckPath, state.slideCount]);
 
   if (!state.deckPath) {
     return (
@@ -286,16 +314,48 @@ function SetupView({ state }: { state: AppState }) {
             spellCheck
           />
 
-          <div className="preview-heading">
-            <EyeOff size={16} />
-            提词卡预览
-          </div>
-          <div className="markdown-preview">
-            {selectedNote.body ? (
-              <ReactMarkdown>{selectedNote.body}</ReactMarkdown>
-            ) : (
-              <span className="empty-preview">本页讲稿为空</span>
-            )}
+          <div className="editor-lower">
+            <section className="notes-preview-section">
+              <div className="preview-heading">
+                <EyeOff size={16} />
+                提词卡预览
+              </div>
+              <div className="markdown-preview">
+                {selectedNote.body ? (
+                  <ReactMarkdown>{selectedNote.body}</ReactMarkdown>
+                ) : (
+                  <span className="empty-preview">本页讲稿为空</span>
+                )}
+              </div>
+            </section>
+
+            <figure className="slide-thumbnail">
+              <figcaption>
+                <span><ImageIcon size={15} /> HTML 页面</span>
+                <strong>第 {selectedIndex + 1} 页</strong>
+              </figcaption>
+              <div
+                className={`slide-thumbnail-frame ${thumbnail?.status ?? "loading"}`}
+                aria-live="polite"
+              >
+                {thumbnailLoading ? (
+                  <div className="thumbnail-state">
+                    <LoaderCircle className="thumbnail-spinner" size={20} />
+                    <span>正在生成缩略图</span>
+                  </div>
+                ) : thumbnail?.status === "ready" && thumbnail.dataUrl ? (
+                  <img
+                    src={thumbnail.dataUrl}
+                    alt={`第 ${selectedIndex + 1} 页 HTML 缩略图`}
+                  />
+                ) : (
+                  <div className="thumbnail-state">
+                    <ImageIcon size={21} />
+                    <span>{thumbnail?.message ?? "无法生成缩略图"}</span>
+                  </div>
+                )}
+              </div>
+            </figure>
           </div>
         </section>
 

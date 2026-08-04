@@ -38,6 +38,20 @@ export interface PresentationSnapshot {
   recognized: boolean;
 }
 
+export type SlideThumbnailStatus = "ready" | "unavailable" | "error";
+
+export interface SlideThumbnail {
+  index: number;
+  status: SlideThumbnailStatus;
+  dataUrl?: string;
+  message?: string;
+}
+
+export interface ThumbnailReadyMessage {
+  requestId: number;
+  snapshot: PresentationSnapshot;
+}
+
 export type NavigationDirection = "next" | "previous";
 export type NudgeDirection = -1 | 1;
 
@@ -48,6 +62,7 @@ export interface CueDeckAPI {
   importNotes(): Promise<AppState>;
   exportNotes(): Promise<AppState>;
   updateNotes(notes: SlideNote[]): Promise<AppState>;
+  getSlideThumbnail(index: number): Promise<SlideThumbnail>;
   startPresentation(): Promise<AppState>;
   stopPresentation(): Promise<AppState>;
   navigate(direction: NavigationDirection): Promise<AppState>;

@@ -415,10 +415,23 @@ textarea:focus-visible {
   display: flex;
   align-items: center;
   gap: 7px;
-  margin: 21px 0 8px;
+  margin: 0 0 8px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 680;
+}
+
+.editor-lower {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(230px, 280px);
+  align-items: end;
+  gap: 20px;
+  margin-top: 21px;
+}
+
+.notes-preview-section {
+  min-width: 0;
 }
 
 .markdown-preview {
@@ -444,6 +457,93 @@ textarea:focus-visible {
 
 .empty-preview {
   color: #8a9692;
+}
+
+.slide-thumbnail {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.slide-thumbnail figcaption {
+  min-width: 0;
+  height: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 680;
+}
+
+.slide-thumbnail figcaption span {
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slide-thumbnail figcaption strong {
+  flex: 0 0 auto;
+  color: var(--blue);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.slide-thumbnail-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 1px solid #c9d3d0;
+  border-radius: 5px;
+  background: #edf2f1;
+}
+
+.slide-thumbnail-frame.ready {
+  background: #111;
+}
+
+.slide-thumbnail-frame.error {
+  border-color: #e3c8c4;
+  background: #fff6f4;
+}
+
+.slide-thumbnail-frame img {
+  width: 100%;
+  height: 100%;
+  display: block;
+  object-fit: contain;
+}
+
+.thumbnail-state {
+  max-width: 90%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: #778580;
+  font-size: 11px;
+  line-height: 1.35;
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.slide-thumbnail-frame.error .thumbnail-state {
+  color: var(--danger);
+}
+
+.thumbnail-spinner {
+  animation: thumbnail-spin 900ms linear infinite;
+}
+
+@keyframes thumbnail-spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .status-pane {
@@ -844,6 +944,15 @@ textarea:focus-visible {
   .save-status {
     display: none;
   }
+
+  .editor-lower {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .slide-thumbnail {
+    width: min(100%, 280px);
+    justify-self: end;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -852,5 +961,9 @@ textarea:focus-visible {
   *::after {
     scroll-behavior: auto !important;
     transition: none !important;
+  }
+
+  .thumbnail-spinner {
+    animation: none;
   }
 }

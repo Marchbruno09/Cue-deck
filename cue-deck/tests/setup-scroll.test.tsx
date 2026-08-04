@@ -55,6 +55,7 @@ describe("setup slide rail", () => {
       importNotes: resolved,
       exportNotes: resolved,
       updateNotes,
+      getSlideThumbnail: async (index) => ({ index, status: "unavailable" }),
       startPresentation: resolved,
       stopPresentation: resolved,
       navigate: resolved,

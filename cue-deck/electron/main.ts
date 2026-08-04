@@ -28,7 +28,9 @@ import type {
   NavigationDirection,
   NudgeDirection,
   PresentationSnapshot,
+  SlideThumbnail,
   SlideNote,
+  ThumbnailReadyMessage,
   WindowBounds,
 } from "../src/types";
 
@@ -59,6 +61,11 @@ let settings: Settings = { ...defaultSettings };
 let setupWindow: BrowserWindow | null = null;
 let presentationWindow: BrowserWindow | null = null;
 let cueWindow: BrowserWindow | null = null;
+let thumbnailWindow: BrowserWindow | null = null;
+let thumbnailDeckPath: string | null = null;
+let thumbnailRequestId = 0;
+let thumbnailQueue: Promise<void> = Promise.resolve();
+const thumbnailCache = new Map<number, SlideThumbnail>();
 let settingsSaveTimer: NodeJS.Timeout | null = null;
 let noteSaveTimer: NodeJS.Timeout | null = null;
 let isQuitting = false;
@@ -282,6 +289,160 @@ function createPresentationWindow(): BrowserWindow {
   return window;
 }
 
+function createThumbnailWindow(): BrowserWindow {
+  const window = new BrowserWindow({
+    title: "CueDeck Thumbnail Renderer",
+    width: 960,
+    height: 540,
+    useContentSize: true,
+    frame: false,
+    show: false,
+    skipTaskbar: true,
+    paintWhenInitiallyHidden: true,
+    backgroundColor: "#000000",
+    webPreferences: {
+      preload: preloadPath,
+      additionalArguments: ["--cue-role=thumbnail"],
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true,
+      backgroundThrottling: false,
+    },
+  });
+
+  attachSafeNavigation(window);
+  window.webContents.setAudioMuted(true);
+  window.on("closed", () => {
+    if (thumbnailWindow === window) {
+      thumbnailWindow = null;
+      thumbnailDeckPath = null;
+    }
+  });
+  return window;
+}
+
+function resetThumbnailRenderer(resetQueue = true): void {
+  thumbnailCache.clear();
+  thumbnailDeckPath = null;
+  if (resetQueue) thumbnailQueue = Promise.resolve();
+  if (thumbnailWindow && !thumbnailWindow.isDestroyed()) thumbnailWindow.destroy();
+  thumbnailWindow = null;
+}
+
+async function ensureThumbnailWindow(deckPath: string): Promise<BrowserWindow> {
+  if (
+    thumbnailWindow &&
+    !thumbnailWindow.isDestroyed() &&
+    thumbnailDeckPath === deckPath
+  ) {
+    return thumbnailWindow;
+  }
+
+  resetThumbnailRenderer(false);
+  const window = createThumbnailWindow();
+  thumbnailWindow = window;
+  thumbnailDeckPath = deckPath;
+  try {
+    await window.loadFile(deckPath);
+    return window;
+  } catch (error) {
+    if (!window.isDestroyed()) window.destroy();
+    throw error;
+  }
+}
+
+function prepareThumbnailSlide(
+  window: BrowserWindow,
+  index: number,
+): Promise<PresentationSnapshot> {
+  const requestId = ++thumbnailRequestId;
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      cleanup();
+      reject(new Error("thumbnail render timed out"));
+    }, 5000);
+
+    const cleanup = () => {
+      clearTimeout(timeout);
+      ipcMain.removeListener("thumbnail:ready", onReady);
+      window.webContents.removeListener("destroyed", onDestroyed);
+    };
+    const onDestroyed = () => {
+      cleanup();
+      reject(new Error("thumbnail renderer closed"));
+    };
+    const onReady = (event: IpcMainEvent, message: ThumbnailReadyMessage) => {
+      if (
+        event.sender.id !== window.webContents.id ||
+        message?.requestId !== requestId
+      ) return;
+      cleanup();
+      resolve(message.snapshot);
+    };
+
+    ipcMain.on("thumbnail:ready", onReady);
+    window.webContents.once("destroyed", onDestroyed);
+    window.webContents.send("thumbnail:render", requestId, index);
+  });
+}
+
+async function generateSlideThumbnail(
+  deckPath: string,
+  index: number,
+): Promise<SlideThumbnail> {
+  if (state.deckPath !== deckPath) {
+    return { index, status: "unavailable", message: "演示已更换" };
+  }
+
+  const cached = thumbnailCache.get(index);
+  if (cached) return cached;
+
+  try {
+    const window = await ensureThumbnailWindow(deckPath);
+    const snapshot = await prepareThumbnailSlide(window, index);
+    if (!snapshot.recognized || snapshot.index !== index) {
+      return { index, status: "unavailable", message: "无法定位这一页" };
+    }
+    if (state.deckPath !== deckPath || thumbnailWindow !== window) {
+      return { index, status: "unavailable", message: "演示已更换" };
+    }
+
+    const capture = await window.webContents.capturePage();
+    const thumbnail = capture.resize({ width: 384, quality: "good" });
+    const result: SlideThumbnail = {
+      index,
+      status: "ready",
+      dataUrl: `data:image/jpeg;base64,${thumbnail.toJPEG(82).toString("base64")}`,
+    };
+    thumbnailCache.set(index, result);
+    return result;
+  } catch {
+    return { index, status: "error", message: "缩略图生成失败" };
+  }
+}
+
+function getSlideThumbnail(requestedIndex: number): Promise<SlideThumbnail> {
+  const index = Math.round(Number(requestedIndex));
+  if (!state.deckPath || !Number.isFinite(index)) {
+    return Promise.resolve({ index: 0, status: "unavailable", message: "尚未打开演示" });
+  }
+  if (!state.adapterRecognized || state.slideCount <= 0) {
+    return Promise.resolve({ index, status: "unavailable", message: "此 HTML 无法自动定位页面" });
+  }
+  if (index < 0 || index >= state.slideCount) {
+    return Promise.resolve({ index, status: "unavailable", message: "这页没有对应的 HTML 页面" });
+  }
+
+  const cached = thumbnailCache.get(index);
+  if (cached) return Promise.resolve(cached);
+
+  const deckPath = state.deckPath;
+  const task = thumbnailQueue.then(() => generateSlideThumbnail(deckPath, index));
+  thumbnailQueue = task.then(() => undefined, () => undefined);
+  return task;
+}
+
 function createCueWindow(): BrowserWindow {
   const savedBounds = validBounds(settings.cueBounds, 340, 220);
   const primary = screen.getPrimaryDisplay().workArea;
@@ -383,6 +544,7 @@ async function openDeck(deckPath: string): Promise<AppState> {
   };
   settings.lastDeckPath = deckPath;
   scheduleSettingsSave();
+  resetThumbnailRenderer();
 
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.destroy();
@@ -506,6 +668,7 @@ function registerIpcHandlers(): void {
     scheduleNoteSave();
     return broadcastState();
   });
+  ipcMain.handle("thumbnail:get", (_event, index: number) => getSlideThumbnail(index));
   ipcMain.handle("presentation:start", () => {
     if (!state.deckPath || !presentationWindow) return publicState();
     setCueWindowLocked(false);
@@ -603,6 +766,7 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  resetThumbnailRenderer();
   globalShortcut.unregisterAll();
 });
 

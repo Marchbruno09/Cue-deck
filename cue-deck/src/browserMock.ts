@@ -50,6 +50,11 @@ export function installBrowserMock(): void {
     importNotes: resolved,
     exportNotes: resolved,
     updateNotes: (notes) => Promise.resolve(update({ notes, savedAt: new Date().toISOString() })),
+    getSlideThumbnail: (index) => Promise.resolve({
+      index,
+      status: "unavailable",
+      message: "浏览器预览不生成 HTML 缩略图",
+    }),
     startPresentation: () => Promise.resolve(update({ presenting: true, cueVisible: true })),
     stopPresentation: () => Promise.resolve(update({ presenting: false, cueVisible: false })),
     navigate: (direction) => Promise.resolve(update({

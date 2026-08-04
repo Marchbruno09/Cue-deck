@@ -45,6 +45,7 @@ describe("private cue window drag state", () => {
       importNotes: resolved,
       exportNotes: resolved,
       updateNotes: resolved,
+      getSlideThumbnail: async (index) => ({ index, status: "unavailable" }),
       startPresentation: resolved,
       stopPresentation: resolved,
       navigate: resolved,

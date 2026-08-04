@@ -6,10 +6,34 @@ import type {
   NudgeDirection,
   PresentationSnapshot,
   SlideNote,
+  ThumbnailReadyMessage,
 } from "../src/types";
-import { inspectPresentation } from "../src/lib/inspectPresentation";
+import {
+  activatePresentationSlide,
+  inspectPresentation,
+} from "../src/lib/inspectPresentation";
 
 const role = process.argv.find((argument) => argument.startsWith("--cue-role="))?.split("=")[1];
+
+async function waitForThumbnailPaint(): Promise<void> {
+  const delay = (milliseconds: number) =>
+    new Promise<void>((resolve) => window.setTimeout(resolve, milliseconds));
+  const nextFrame = () => new Promise<void>((resolve) => {
+    window.requestAnimationFrame(() => resolve());
+  });
+
+  const pendingImages = Array.from(document.images).filter((image) => !image.complete);
+  const imagesReady = Promise.all(pendingImages.map((image) => new Promise<void>((resolve) => {
+    image.addEventListener("load", () => resolve(), { once: true });
+    image.addEventListener("error", () => resolve(), { once: true });
+  })));
+  const fontsReady = document.fonts?.ready ?? Promise.resolve();
+
+  await Promise.race([Promise.all([fontsReady, imagesReady]), delay(1400)]);
+  await nextFrame();
+  await nextFrame();
+  await delay(60);
+}
 
 if (role === "presentation") {
   let lastSnapshot = "";
@@ -42,6 +66,14 @@ if (role === "presentation") {
   } else {
     startObserver();
   }
+} else if (role === "thumbnail") {
+  ipcRenderer.on("thumbnail:render", async (_event, requestId: number, index: number) => {
+    const snapshot = activatePresentationSlide(document, index);
+    window.scrollTo(0, 0);
+    await waitForThumbnailPaint();
+    const message: ThumbnailReadyMessage = { requestId, snapshot };
+    ipcRenderer.send("thumbnail:ready", message);
+  });
 } else {
   const api: CueDeckAPI = {
     getState: () => ipcRenderer.invoke("state:get"),
@@ -50,6 +82,7 @@ if (role === "presentation") {
     importNotes: () => ipcRenderer.invoke("notes:import"),
     exportNotes: () => ipcRenderer.invoke("notes:export"),
     updateNotes: (notes: SlideNote[]) => ipcRenderer.invoke("notes:update", notes),
+    getSlideThumbnail: (index: number) => ipcRenderer.invoke("thumbnail:get", index),
     startPresentation: () => ipcRenderer.invoke("presentation:start"),
     stopPresentation: () => ipcRenderer.invoke("presentation:stop"),
     navigate: (direction: NavigationDirection) =>
