@@ -8,6 +8,7 @@ import {
   EyeOff,
   FileText,
   FolderOpen,
+  GripVertical,
   Import,
   Lock,
   Minus,
@@ -375,6 +376,13 @@ function CueView({ state }: { state: AppState }) {
   return (
     <main className={`cue-shell ${state.cueLocked ? "locked" : ""}`}>
       <header className="cue-titlebar">
+        <span
+          className="cue-drag-handle"
+          title={state.cueLocked ? "位置已锁定，请先解锁" : "拖动悬浮卡片"}
+          aria-label={state.cueLocked ? "位置已锁定" : "拖动悬浮卡片"}
+        >
+          <GripVertical size={17} />
+        </span>
         <div className="private-label"><Lock size={13} /> 私密</div>
         <span className="cue-deck-name" title={state.deckName ?? undefined}>{state.deckName}</span>
         <span className="cue-counter">
@@ -384,10 +392,11 @@ function CueView({ state }: { state: AppState }) {
         </span>
         <div className="cue-window-actions">
           <button
-            className="cue-icon-button"
+            className={`cue-icon-button ${state.cueLocked ? "active" : ""}`}
             onClick={() => void window.cueDeck.toggleCueLock()}
             title={state.cueLocked ? "解锁位置" : "锁定位置"}
             aria-label={state.cueLocked ? "解锁位置" : "锁定位置"}
+            aria-pressed={state.cueLocked}
           >
             {state.cueLocked ? <Lock size={16} /> : <Unlock size={16} />}
           </button>

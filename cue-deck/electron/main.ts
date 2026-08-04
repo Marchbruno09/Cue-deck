@@ -109,12 +109,15 @@ async function loadSettings(): Promise<void> {
     settings = {
       ...defaultSettings,
       ...loaded,
+      // A position lock is only useful during the current presentation.
+      // Always migrate older persisted locks back to an unlocked window.
+      cueLocked: false,
       progressByDeck: loaded.progressByDeck ?? {},
     };
   } catch {
     settings = { ...defaultSettings };
   }
-  state.cueLocked = settings.cueLocked;
+  state.cueLocked = false;
   state.fontSize = settings.fontSize;
 }
 
@@ -439,6 +442,15 @@ function toggleCueVisibility(): AppState {
   return broadcastState();
 }
 
+function setCueWindowLocked(locked: boolean): void {
+  state.cueLocked = locked;
+  // Do not persist the lock across presentations or app restarts.
+  settings.cueLocked = false;
+  cueWindow?.setMovable(!locked);
+  cueWindow?.setResizable(!locked);
+  scheduleSettingsSave();
+}
+
 function registerIpcHandlers(): void {
   ipcMain.handle("state:get", () => publicState());
   ipcMain.handle("deck:choose", async () => {
@@ -496,6 +508,7 @@ function registerIpcHandlers(): void {
   });
   ipcMain.handle("presentation:start", () => {
     if (!state.deckPath || !presentationWindow) return publicState();
+    setCueWindowLocked(false);
     if (!cueWindow || cueWindow.isDestroyed()) cueWindow = createCueWindow();
     arrangePresentationWindows();
     state.presenting = true;
@@ -526,11 +539,7 @@ function registerIpcHandlers(): void {
     return broadcastState();
   });
   ipcMain.handle("cue:toggle-lock", () => {
-    state.cueLocked = !state.cueLocked;
-    settings.cueLocked = state.cueLocked;
-    cueWindow?.setMovable(!state.cueLocked);
-    cueWindow?.setResizable(!state.cueLocked);
-    scheduleSettingsSave();
+    setCueWindowLocked(!state.cueLocked);
     return broadcastState();
   });
   ipcMain.handle("cue:toggle-visibility", () => toggleCueVisibility());
