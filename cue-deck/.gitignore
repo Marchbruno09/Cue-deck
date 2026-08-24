@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-electron/
 release/
+build/
 .npm-cache/
 *.log
 .DS_Store

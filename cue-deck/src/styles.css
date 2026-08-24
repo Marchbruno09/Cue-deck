@@ -574,13 +574,18 @@ textarea:focus-visible {
 }
 
 .status-dot-row,
-.privacy-state {
+.privacy-state,
+.notes-source {
   display: flex;
   align-items: center;
   gap: 7px;
   margin-top: 9px;
   color: var(--muted);
   font-size: 12px;
+}
+
+.notes-source {
+  color: var(--blue);
 }
 
 .status-dot {

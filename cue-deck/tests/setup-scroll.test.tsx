@@ -15,11 +15,13 @@ import type { AppState, CueDeckAPI } from "../src/types";
 const state: AppState = {
   deckPath: "/presentations/demo.html",
   deckName: "demo.html",
+  deckType: "html",
   notesPath: "/presentations/demo.cue.md",
   notes: Array.from({ length: 21 }, (_, index) => ({
     ...createEmptyNote(index),
     title: `第 ${index + 1} 页`,
   })),
+  notesSource: "local",
   slideCount: 21,
   currentIndex: 0,
   adapter: "frontend-slides",
@@ -29,6 +31,8 @@ const state: AppState = {
   cueLocked: false,
   fontSize: 22,
   displayCount: 1,
+  previewStatus: "ready",
+  previewError: null,
   lastError: null,
   savedAt: null,
 };
@@ -53,6 +57,7 @@ describe("setup slide rail", () => {
       chooseDeck: resolved,
       openDeck: resolved,
       importNotes: resolved,
+      importPowerPointNotes: resolved,
       exportNotes: resolved,
       updateNotes,
       getSlideThumbnail: async (index) => ({ index, status: "unavailable" }),

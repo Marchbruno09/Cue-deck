@@ -65,6 +65,21 @@ describe("presentation inspection", () => {
     });
   });
 
+  it("detects and activates generated PDF pages", () => {
+    const document = documentFor(`
+      <section data-cue-pdf-slide class="active">One</section>
+      <section data-cue-pdf-slide>Two</section>
+    `);
+    expect(inspectPresentation(document)).toEqual({
+      index: 0,
+      count: 2,
+      adapter: "pdf",
+      recognized: true,
+    });
+    expect(activatePresentationSlide(document, 1).index).toBe(1);
+    expect(document.querySelectorAll("[data-cue-pdf-slide]")[1].classList.contains("active")).toBe(true);
+  });
+
   it("falls back to manual mode for unknown pages", () => {
     expect(inspectPresentation(documentFor("<main>Regular page</main>"))).toEqual({
       index: 0,

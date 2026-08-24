@@ -39,6 +39,16 @@ export function inspectPresentation(document: Document): PresentationSnapshot {
     };
   }
 
+  const pdfSlides = Array.from(document.querySelectorAll("[data-cue-pdf-slide]"));
+  if (pdfSlides.length > 0) {
+    return {
+      index: visibleSlideIndex(pdfSlides),
+      count: pdfSlides.length,
+      adapter: "pdf",
+      recognized: true,
+    };
+  }
+
   const frontendSlides = Array.from(document.querySelectorAll(".slide"));
   if (frontendSlides.length > 0) {
     return {
@@ -151,6 +161,8 @@ export function activatePresentationSlide(
 
   if (before.adapter === "reveal") {
     setRevealSlideState(document, targetIndex);
+  } else if (before.adapter === "pdf") {
+    setFlatSlideState(Array.from(document.querySelectorAll("[data-cue-pdf-slide]")), targetIndex, "active");
   } else if (before.adapter === "frontend-slides") {
     setFlatSlideState(Array.from(document.querySelectorAll(".slide")), targetIndex, "active");
   } else if (before.adapter === "generic") {

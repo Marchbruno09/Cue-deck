@@ -1,13 +1,13 @@
 # CueDeck
 
-CueDeck 是一个只在 Mac 本机运行的 HTML 演示提词工具。它把演示和讲稿放在两个独立窗口中，让 Zoom 只共享演示窗口。
+CueDeck 是一个只在 Mac 本机运行的 HTML / PDF / PowerPoint 演示提词工具。它把演示和讲稿放在独立窗口中，让 Zoom 只共享演示内容。
 
 ## 使用
 
-1. 打开 `CueDeck.app`，选择一个 `.html` 演示文件。
-2. 直接逐页编写讲稿，或导入 Markdown。
+1. 打开 `CueDeck.app`，选择 HTML、PDF 或现代 PowerPoint 演示文件。
+2. 直接逐页编写讲稿，或导入 Markdown。PowerPoint 会在首次导入时自动读取每页 speaker notes。
 3. 点击“开始演示”。
-4. 在 Zoom 中只选择标题以 `CueDeck Presentation -` 开头的窗口。
+4. 在 Zoom 中，HTML 只共享标题以 `CueDeck Presentation -` 开头的窗口；PowerPoint 只共享其 Slide Show 窗口。
 5. 点击提词卡正文、下一步按钮、空格或右方向键继续；左方向键返回。
 6. `Command+Shift+H` 可立即隐藏或恢复提词卡。
 
@@ -30,7 +30,22 @@ CueDeck 是一个只在 Mac 本机运行的 HTML 演示提词工具。它把演�
 - 需要验证的证据
 ```
 
-讲稿默认自动保存为与演示同目录、同文件名的 `.cue.md` 文件。HTML 原文件不会被修改。
+讲稿默认自动保存为与演示同目录、同文件名的 `.cue.md` 文件。演示原文件不会被修改。
+
+## PowerPoint
+
+- 支持 `.pptx`、`.pptm`、`.ppsx` 和 `.ppsm`；旧版 `.ppt` 需先在 PowerPoint 中另存为 `.pptx`。
+- 首次打开时读取每页 speaker notes，并建立本机 `.cue.md` 讲稿副本。
+- 已有 `.cue.md` 会被保留；“读取 PPT 备注”可主动用 PowerPoint 内备注刷新讲稿。
+- 演示由 Microsoft PowerPoint 原生放映，CueDeck 根据实际页码同步提词，因此页内动画不会提前切换讲稿。
+- 缩略图由 PowerPoint 和 macOS 本机组件生成并缓存在本机。首次使用时，macOS 会要求允许 CueDeck 控制 PowerPoint。
+
+## PDF
+
+- 支持标准 `.pdf` 文件，每个 PDF 页面会作为一页演示导入。
+- 首次导入时使用 macOS PDFKit 在本机生成页面图像并缓存，不修改原始 PDF。
+- PDF 演示在独立的 `CueDeck Presentation - 文件名` 窗口中显示，支持鼠标点击、空格、左右方向键和提词卡翻页。
+- 讲稿保存在同目录的 `.cue.md` 文件中，也可以继续导入或导出 Markdown。
 
 ## 本地开发
 

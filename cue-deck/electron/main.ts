@@ -1,6 +1,8 @@
 import { promises as fs } from "node:fs";
+import { createHash } from "node:crypto";
+import { execFile } from "node:child_process";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   app,
   BrowserWindow,
@@ -8,6 +10,7 @@ import {
   globalShortcut,
   ipcMain,
   Menu,
+  nativeImage,
   screen,
   shell,
   type IpcMainEvent,
@@ -22,6 +25,15 @@ import {
   serializeCueMarkdown,
 } from "../src/lib/notes";
 import { readNotesFile, writeNotesFile } from "./note-store";
+import { readPowerPointDeck, type PowerPointDeck } from "./pptx";
+import {
+  cancelPowerPointPreview,
+  navigatePowerPoint,
+  powerPointSlideNumber,
+  renderPowerPointSlides,
+  startPowerPointPresentation,
+  stopPowerPointPresentation,
+} from "./powerpoint";
 import type {
   AdapterKind,
   AppState,
@@ -38,6 +50,8 @@ const moduleDirectory = path.dirname(fileURLToPath(import.meta.url));
 const rendererDirectory = path.join(moduleDirectory, "../dist");
 const preloadPath = path.join(moduleDirectory, "preload.js");
 const developmentServerUrl = process.env.VITE_DEV_SERVER_URL;
+const powerPointExtensions = new Set([".pptx", ".pptm", ".ppsx", ".ppsm"]);
+const pdfExtensions = new Set([".pdf"]);
 
 interface Settings {
   lastDeckPath: string | null;
@@ -66,6 +80,14 @@ let thumbnailDeckPath: string | null = null;
 let thumbnailRequestId = 0;
 let thumbnailQueue: Promise<void> = Promise.resolve();
 const thumbnailCache = new Map<number, SlideThumbnail>();
+let powerPointPreviewDirectory: string | null = null;
+let powerPointPackageThumbnail: Buffer | null = null;
+let powerPointPreviewGeneration = 0;
+let pdfPreviewDirectory: string | null = null;
+let pdfPresentationPath: string | null = null;
+let powerPointPollTimer: NodeJS.Timeout | null = null;
+let powerPointPollBusy = false;
+let powerPointClosedPolls = 0;
 let settingsSaveTimer: NodeJS.Timeout | null = null;
 let noteSaveTimer: NodeJS.Timeout | null = null;
 let isQuitting = false;
@@ -73,8 +95,10 @@ let isQuitting = false;
 let state: AppState = {
   deckPath: null,
   deckName: null,
+  deckType: null,
   notesPath: null,
   notes: [],
+  notesSource: null,
   slideCount: 0,
   currentIndex: 0,
   adapter: "manual",
@@ -84,6 +108,8 @@ let state: AppState = {
   cueLocked: false,
   fontSize: 22,
   displayCount: 1,
+  previewStatus: "idle",
+  previewError: null,
   lastError: null,
   savedAt: null,
 };
@@ -155,6 +181,42 @@ function notesPathForDeck(deckPath: string): string {
     path.dirname(deckPath),
     `${path.basename(deckPath, extension)}.cue.md`,
   );
+}
+
+async function pathExists(filePath: string): Promise<boolean> {
+  try {
+    await fs.access(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function previewDirectoryForPowerPoint(deckPath: string): Promise<string> {
+  const stats = await fs.stat(deckPath);
+  const cacheKey = createHash("sha256")
+    .update(deckPath)
+    .update(String(stats.size))
+    .update(String(stats.mtimeMs))
+    .digest("hex")
+    .slice(0, 20);
+  return path.join(app.getPath("userData"), "powerpoint-previews", cacheKey);
+}
+
+function powerPointPreviewPath(index: number): string | null {
+  return powerPointPreviewDirectory
+    ? path.join(powerPointPreviewDirectory, `slide-${index + 1}.png`)
+    : null;
+}
+
+async function hasCompletePowerPointPreview(slideCount: number): Promise<boolean> {
+  if (!powerPointPreviewDirectory) return false;
+  const checks = await Promise.all(
+    Array.from({ length: slideCount }, (_, index) =>
+      pathExists(path.join(powerPointPreviewDirectory!, `slide-${index + 1}.png`)),
+    ),
+  );
+  return checks.every(Boolean);
 }
 
 async function writeNotes(): Promise<void> {
@@ -330,6 +392,189 @@ function resetThumbnailRenderer(resetQueue = true): void {
   thumbnailWindow = null;
 }
 
+function resetPowerPointPreview(): void {
+  cancelPowerPointPreview();
+  powerPointPreviewGeneration += 1;
+  powerPointPreviewDirectory = null;
+  powerPointPackageThumbnail = null;
+}
+
+function resetPdfPreview(): void {
+  pdfPreviewDirectory = null;
+  pdfPresentationPath = null;
+}
+
+async function resolvePdfRenderer(): Promise<string> {
+  const candidates = [
+    process.env.CUEDECK_PDF_RENDERER,
+    path.join(process.resourcesPath, "bin", "cue-deck-pdf-renderer"),
+    path.join(moduleDirectory, "../build/cue-deck-pdf-renderer"),
+  ].filter((candidate): candidate is string => Boolean(candidate));
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) return candidate;
+  }
+  return "cue-deck-pdf-renderer";
+}
+
+function runPdfRenderer(
+  rendererPath: string,
+  deckPath: string,
+  outputDirectory: string,
+): Promise<void> {
+  return new Promise((resolve, reject) => {
+    execFile(
+      rendererPath,
+      [deckPath, outputDirectory, "1.5"],
+      { timeout: 180_000, maxBuffer: 1024 * 1024 },
+      (error, _stdout, stderr) => {
+        if (error) {
+          reject(new Error(String(stderr || error.message).trim()));
+          return;
+        }
+        resolve();
+      },
+    );
+  });
+}
+
+async function pdfPageCount(outputDirectory: string): Promise<number> {
+  const count = Number.parseInt(
+    await fs.readFile(path.join(outputDirectory, "page-count.txt"), "utf8"),
+    10,
+  );
+  if (!Number.isInteger(count) || count <= 0) {
+    throw new Error("PDF 没有可显示的页面");
+  }
+  return count;
+}
+
+async function hasCompletePdfPreview(
+  outputDirectory: string,
+  slideCount: number,
+): Promise<boolean> {
+  try {
+    if (await pdfPageCount(outputDirectory) !== slideCount) return false;
+  } catch {
+    return false;
+  }
+  const checks = await Promise.all(
+    Array.from({ length: slideCount }, (_, index) =>
+      pathExists(path.join(outputDirectory, `slide-${index + 1}.png`)),
+    ),
+  );
+  return checks.every(Boolean);
+}
+
+function pdfPreviewPath(index: number): string | null {
+  return pdfPreviewDirectory
+    ? path.join(pdfPreviewDirectory, `slide-${index + 1}.png`)
+    : null;
+}
+
+async function createPdfPresentationHtml(
+  outputDirectory: string,
+  slideCount: number,
+): Promise<string> {
+  const slides = Array.from({ length: slideCount }, (_, index) => ({
+    index,
+    url: pathToFileURL(path.join(outputDirectory, `slide-${index + 1}.png`)).href,
+  }));
+  const html = `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CueDeck PDF Presentation</title>
+<style>
+  :root, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #111; }
+  body { display: grid; place-items: center; }
+  .slide { display: none; width: 100vw; height: 100vh; place-items: center; }
+  .slide.active { display: grid; }
+  img { display: block; max-width: 100vw; max-height: 100vh; width: auto; height: auto; object-fit: contain; user-select: none; }
+</style>
+</head>
+<body>
+${slides.map(({ index, url }) => `<section class="slide${index === 0 ? " active" : ""}" data-cue-pdf-slide data-slide-index="${index}" aria-hidden="${index === 0 ? "false" : "true"}"><img src="${url}" alt=""></section>`).join("\n")}
+<script>
+(() => {
+  const slides = Array.from(document.querySelectorAll('.slide'));
+  let current = 0;
+  const show = (next) => {
+    current = Math.max(0, Math.min(slides.length - 1, next));
+    slides.forEach((slide, index) => {
+      const active = index === current;
+      slide.classList.toggle('active', active);
+      slide.setAttribute('aria-hidden', active ? 'false' : 'true');
+    });
+  };
+  window.addEventListener('keydown', (event) => {
+    if (event.key === 'ArrowRight' || event.key === ' ' || event.key === 'PageDown') {
+      event.preventDefault(); show(current + 1);
+    } else if (event.key === 'ArrowLeft' || event.key === 'PageUp') {
+      event.preventDefault(); show(current - 1);
+    }
+  });
+  document.body.addEventListener('click', () => show(current + 1));
+})();
+</script>
+</body>
+</html>`;
+  const presentationPath = path.join(outputDirectory, "presentation.html");
+  await fs.writeFile(presentationPath, html, "utf8");
+  return presentationPath;
+}
+
+async function preparePdfPreview(
+  deckPath: string,
+  outputDirectory: string,
+): Promise<number> {
+  await fs.mkdir(outputDirectory, { recursive: true });
+  let cachedSlideCount = 0;
+  try {
+    cachedSlideCount = await pdfPageCount(outputDirectory);
+  } catch {
+    // Render below when this PDF has not been cached yet.
+  }
+  if (!cachedSlideCount || !(await hasCompletePdfPreview(outputDirectory, cachedSlideCount))) {
+    const rendererPath = await resolvePdfRenderer();
+    await runPdfRenderer(rendererPath, deckPath, outputDirectory);
+  }
+  const slideCount = await pdfPageCount(outputDirectory);
+  pdfPresentationPath = await createPdfPresentationHtml(outputDirectory, slideCount);
+  return slideCount;
+}
+
+async function preparePowerPointPreview(
+  deckPath: string,
+  slideCount: number,
+  generation: number,
+): Promise<void> {
+  if (!powerPointPreviewDirectory) return;
+  const outputDirectory = powerPointPreviewDirectory;
+  try {
+    await fs.mkdir(outputDirectory, { recursive: true });
+    if (!(await hasCompletePowerPointPreview(slideCount))) {
+      await renderPowerPointSlides(deckPath, outputDirectory);
+    }
+    if (
+      generation !== powerPointPreviewGeneration ||
+      state.deckPath !== deckPath ||
+      !(await hasCompletePowerPointPreview(slideCount))
+    ) return;
+
+    thumbnailCache.clear();
+    state.previewStatus = "ready";
+    state.previewError = null;
+    broadcastState();
+  } catch (error) {
+    if (generation !== powerPointPreviewGeneration || state.deckPath !== deckPath) return;
+    state.previewStatus = "error";
+    state.previewError = error instanceof Error ? error.message : String(error);
+    broadcastState();
+  }
+}
+
 async function ensureThumbnailWindow(deckPath: string): Promise<BrowserWindow> {
   if (
     thumbnailWindow &&
@@ -422,20 +667,84 @@ async function generateSlideThumbnail(
   }
 }
 
-function getSlideThumbnail(requestedIndex: number): Promise<SlideThumbnail> {
-  const index = Math.round(Number(requestedIndex));
-  if (!state.deckPath || !Number.isFinite(index)) {
-    return Promise.resolve({ index: 0, status: "unavailable", message: "尚未打开演示" });
-  }
-  if (!state.adapterRecognized || state.slideCount <= 0) {
-    return Promise.resolve({ index, status: "unavailable", message: "此 HTML 无法自动定位页面" });
-  }
-  if (index < 0 || index >= state.slideCount) {
-    return Promise.resolve({ index, status: "unavailable", message: "这页没有对应的 HTML 页面" });
+function thumbnailFromBuffer(index: number, buffer: Buffer): SlideThumbnail | null {
+  const image = nativeImage.createFromBuffer(buffer);
+  if (image.isEmpty()) return null;
+  const resized = image.resize({ width: 384, quality: "good" });
+  return {
+    index,
+    status: "ready",
+    dataUrl: `data:image/jpeg;base64,${resized.toJPEG(82).toString("base64")}`,
+  };
+}
+
+async function getPowerPointThumbnail(index: number): Promise<SlideThumbnail> {
+  const cached = thumbnailCache.get(index);
+  if (cached) return cached;
+
+  const previewPath = powerPointPreviewPath(index);
+  if (state.previewStatus === "ready" && previewPath) {
+    try {
+      const result = thumbnailFromBuffer(index, await fs.readFile(previewPath));
+      if (result) {
+        thumbnailCache.set(index, result);
+        return result;
+      }
+    } catch {
+      // Fall through to the package thumbnail or an explicit error state.
+    }
   }
 
+  if (index === 0 && powerPointPackageThumbnail) {
+    const fallback = thumbnailFromBuffer(index, powerPointPackageThumbnail);
+    if (fallback) return fallback;
+  }
+  if (state.previewStatus === "loading") {
+    return { index, status: "loading", message: "正在通过 PowerPoint 生成缩略图" };
+  }
+  return {
+    index,
+    status: "error",
+    message: state.previewError ?? "这页 PowerPoint 缩略图暂时不可用",
+  };
+}
+
+async function getPdfThumbnail(index: number): Promise<SlideThumbnail> {
   const cached = thumbnailCache.get(index);
-  if (cached) return Promise.resolve(cached);
+  if (cached) return cached;
+  const previewPath = pdfPreviewPath(index);
+  if (!previewPath) {
+    return { index, status: "error", message: "PDF 缩略图暂时不可用" };
+  }
+  try {
+    const result = thumbnailFromBuffer(index, await fs.readFile(previewPath));
+    if (result) {
+      thumbnailCache.set(index, result);
+      return result;
+    }
+  } catch {
+    // Fall through to a user-facing error state.
+  }
+  return { index, status: "error", message: "PDF 缩略图暂时不可用" };
+}
+
+async function getSlideThumbnail(requestedIndex: number): Promise<SlideThumbnail> {
+  const index = Math.round(Number(requestedIndex));
+  if (!state.deckPath || !Number.isFinite(index)) {
+    return { index: 0, status: "unavailable", message: "尚未打开演示" };
+  }
+  if (!state.adapterRecognized || state.slideCount <= 0) {
+    return { index, status: "unavailable", message: "此演示无法自动定位页面" };
+  }
+  if (index < 0 || index >= state.slideCount) {
+    return { index, status: "unavailable", message: "这页没有对应的演示页面" };
+  }
+
+  if (state.deckType === "powerpoint") return getPowerPointThumbnail(index);
+  if (state.deckType === "pdf") return getPdfThumbnail(index);
+
+  const cached = thumbnailCache.get(index);
+  if (cached) return cached;
 
   const deckPath = state.deckPath;
   const task = thumbnailQueue.then(() => generateSlideThumbnail(deckPath, index));
@@ -499,13 +808,15 @@ function createCueWindow(): BrowserWindow {
 }
 
 function arrangePresentationWindows(): void {
-  if (!presentationWindow || !cueWindow) return;
+  if (!cueWindow) return;
   const displays = screen.getAllDisplays();
   const primary = screen.getPrimaryDisplay();
   const presentationDisplay = displays.find((display) => display.id !== primary.id) ?? primary;
 
-  presentationWindow.setBounds(presentationDisplay.bounds, false);
-  presentationWindow.setAlwaysOnTop(false);
+  if (presentationWindow) {
+    presentationWindow.setBounds(presentationDisplay.bounds, false);
+    presentationWindow.setAlwaysOnTop(false);
+  }
 
   if (!settings.cueBounds || !validBounds(settings.cueBounds, 340, 220)) {
     const cueWidth = displays.length > 1 ? 560 : 430;
@@ -520,31 +831,33 @@ function arrangePresentationWindows(): void {
   cueWindow.setAlwaysOnTop(true, "floating");
 }
 
-async function openDeck(deckPath: string): Promise<AppState> {
-  const extension = path.extname(deckPath).toLowerCase();
-  if (![".html", ".htm"].includes(extension)) {
-    throw new Error("请选择 HTML 演示文件。");
-  }
-  await fs.access(deckPath);
-
+async function openHtmlDeck(deckPath: string): Promise<AppState> {
   const sidecarPath = notesPathForDeck(deckPath);
+  const sidecarExists = await pathExists(sidecarPath);
   const notes = await readNotesFile(sidecarPath);
 
   state = {
     ...state,
     deckPath,
     deckName: path.basename(deckPath),
+    deckType: "html",
     notesPath: sidecarPath,
     notes,
+    notesSource: sidecarExists ? "local" : null,
     slideCount: 0,
     currentIndex: settings.progressByDeck[deckPath] ?? 0,
     adapter: "manual",
     adapterRecognized: false,
+    previewStatus: "ready",
+    previewError: null,
     lastError: null,
+    savedAt: null,
   };
   settings.lastDeckPath = deckPath;
   scheduleSettingsSave();
   resetThumbnailRenderer();
+  resetPowerPointPreview();
+  resetPdfPreview();
 
   if (presentationWindow && !presentationWindow.isDestroyed()) {
     presentationWindow.destroy();
@@ -561,6 +874,149 @@ async function openDeck(deckPath: string): Promise<AppState> {
   return broadcastState();
 }
 
+async function openPowerPointDeck(
+  deckPath: string,
+  powerPointDeck?: PowerPointDeck,
+): Promise<AppState> {
+  const importedDeck = powerPointDeck ?? await readPowerPointDeck(deckPath);
+  const sidecarPath = notesPathForDeck(deckPath);
+  const sidecarExists = await pathExists(sidecarPath);
+  const notes = sidecarExists
+    ? ensureNoteCount(await readNotesFile(sidecarPath), importedDeck.slideCount)
+    : importedDeck.notes;
+
+  resetThumbnailRenderer();
+  resetPowerPointPreview();
+  resetPdfPreview();
+  if (presentationWindow && !presentationWindow.isDestroyed()) presentationWindow.destroy();
+  presentationWindow = null;
+  powerPointPackageThumbnail = importedDeck.packageThumbnail;
+  powerPointPreviewDirectory = await previewDirectoryForPowerPoint(deckPath);
+  const previewReady = await hasCompletePowerPointPreview(importedDeck.slideCount);
+  const generation = powerPointPreviewGeneration;
+
+  state = {
+    ...state,
+    deckPath,
+    deckName: path.basename(deckPath),
+    deckType: "powerpoint",
+    notesPath: sidecarPath,
+    notes,
+    notesSource: sidecarExists ? "local" : "powerpoint",
+    slideCount: importedDeck.slideCount,
+    currentIndex: clampIndex(
+      settings.progressByDeck[deckPath] ?? 0,
+      importedDeck.slideCount,
+    ),
+    adapter: "powerpoint",
+    adapterRecognized: true,
+    previewStatus: previewReady ? "ready" : "loading",
+    previewError: null,
+    lastError: null,
+    savedAt: null,
+  };
+  settings.lastDeckPath = deckPath;
+  scheduleSettingsSave();
+
+  if (!sidecarExists) {
+    try {
+      await writeNotesFile(sidecarPath, notes);
+      state.savedAt = new Date().toISOString();
+    } catch (error) {
+      state.lastError = `无法保存 PowerPoint 讲稿副本：${String(error)}`;
+    }
+  }
+
+  const snapshot = broadcastState();
+  if (!previewReady) {
+    void preparePowerPointPreview(deckPath, importedDeck.slideCount, generation);
+  }
+  return snapshot;
+}
+
+async function openPdfDeck(deckPath: string): Promise<AppState> {
+  const sidecarPath = notesPathForDeck(deckPath);
+  const sidecarExists = await pathExists(sidecarPath);
+  const stats = await fs.stat(deckPath);
+  const cacheKey = createHash("sha256")
+    .update(deckPath)
+    .update(String(stats.size))
+    .update(String(stats.mtimeMs))
+    .digest("hex")
+    .slice(0, 20);
+  const outputDirectory = path.join(app.getPath("userData"), "pdf-previews", cacheKey);
+
+  resetThumbnailRenderer();
+  resetPowerPointPreview();
+  resetPdfPreview();
+  if (presentationWindow && !presentationWindow.isDestroyed()) presentationWindow.destroy();
+
+  let slideCount: number;
+  try {
+    slideCount = await preparePdfPreview(deckPath, outputDirectory);
+  } catch (error) {
+    throw new Error(
+      `无法读取 PDF：${error instanceof Error ? error.message : String(error)}`,
+    );
+  }
+
+  const notes = sidecarExists
+    ? ensureNoteCount(await readNotesFile(sidecarPath), slideCount)
+    : ensureNoteCount([], slideCount);
+
+  pdfPreviewDirectory = outputDirectory;
+  presentationWindow = createPresentationWindow();
+  presentationWindow.setTitle(`CueDeck Presentation - ${path.basename(deckPath)}`);
+  try {
+    await presentationWindow.loadFile(pdfPresentationPath!);
+  } catch (error) {
+    state.lastError = `无法打开 PDF 演示：${String(error)}`;
+  }
+
+  state = {
+    ...state,
+    deckPath,
+    deckName: path.basename(deckPath),
+    deckType: "pdf",
+    notesPath: sidecarPath,
+    notes,
+    notesSource: sidecarExists ? "local" : null,
+    slideCount,
+    currentIndex: clampIndex(settings.progressByDeck[deckPath] ?? 0, slideCount),
+    adapter: "pdf",
+    adapterRecognized: true,
+    previewStatus: "ready",
+    previewError: null,
+    lastError: null,
+    savedAt: null,
+  };
+  settings.lastDeckPath = deckPath;
+  scheduleSettingsSave();
+
+  if (!sidecarExists) {
+    try {
+      await writeNotesFile(sidecarPath, notes);
+      state.savedAt = new Date().toISOString();
+    } catch (error) {
+      state.lastError = `无法保存 PDF 讲稿副本：${String(error)}`;
+    }
+  }
+  presentationWindow.webContents.send("presentation:activate", state.currentIndex);
+  return broadcastState();
+}
+
+async function openDeck(deckPath: string): Promise<AppState> {
+  const extension = path.extname(deckPath).toLowerCase();
+  await fs.access(deckPath);
+  if ([".html", ".htm"].includes(extension)) return openHtmlDeck(deckPath);
+  if (powerPointExtensions.has(extension)) return openPowerPointDeck(deckPath);
+  if (pdfExtensions.has(extension)) return openPdfDeck(deckPath);
+  if (extension === ".ppt") {
+    throw new Error("旧版 .ppt 暂不支持，请先在 PowerPoint 中另存为 .pptx。");
+  }
+  throw new Error("请选择 HTML、PDF 或 PowerPoint (.pptx) 演示文件。");
+}
+
 function moveManualIndex(delta: NudgeDirection): void {
   const count = Math.max(state.slideCount, state.notes.length, 1);
   state.currentIndex = clampIndex(state.currentIndex + delta, count);
@@ -569,6 +1025,13 @@ function moveManualIndex(delta: NudgeDirection): void {
 }
 
 function sendNavigation(direction: NavigationDirection): void {
+  if (state.deckType === "powerpoint") {
+    void navigatePowerPoint(direction).catch((error) => {
+      state.lastError = error instanceof Error ? error.message : String(error);
+      broadcastState();
+    });
+    return;
+  }
   if (!presentationWindow || presentationWindow.isDestroyed()) return;
   const keyCode = direction === "next" ? "Right" : "Left";
   presentationWindow.webContents.sendInputEvent({ type: "keyDown", keyCode });
@@ -578,11 +1041,113 @@ function sendNavigation(direction: NavigationDirection): void {
   }, 140);
 }
 
-function stopPresentation(): void {
+function stopPowerPointPolling(): void {
+  if (powerPointPollTimer) clearInterval(powerPointPollTimer);
+  powerPointPollTimer = null;
+  powerPointPollBusy = false;
+  powerPointClosedPolls = 0;
+}
+
+async function syncPowerPointState(): Promise<void> {
+  if (powerPointPollBusy || !state.presenting || state.deckType !== "powerpoint") return;
+  powerPointPollBusy = true;
+  try {
+    const slideNumber = await powerPointSlideNumber();
+    if (slideNumber === null) {
+      powerPointClosedPolls += 1;
+      if (powerPointClosedPolls >= 2) stopPresentation(true);
+      return;
+    }
+    powerPointClosedPolls = 0;
+    const nextIndex = clampIndex(slideNumber - 1, state.slideCount);
+    if (nextIndex !== state.currentIndex) {
+      state.currentIndex = nextIndex;
+      rememberProgress();
+      broadcastState();
+    }
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (state.lastError !== message) {
+      state.lastError = message;
+      broadcastState();
+    }
+  } finally {
+    powerPointPollBusy = false;
+  }
+}
+
+function startPowerPointPolling(): void {
+  stopPowerPointPolling();
+  void syncPowerPointState();
+  powerPointPollTimer = setInterval(() => void syncPowerPointState(), 350);
+}
+
+async function startPresentation(): Promise<AppState> {
+  if (!state.deckPath) return publicState();
+  setCueWindowLocked(false);
+  if (!cueWindow || cueWindow.isDestroyed()) cueWindow = createCueWindow();
+  arrangePresentationWindows();
+  state.lastError = null;
+
+  if (state.deckType === "powerpoint") {
+    // Preview export and slideshow control both use PowerPoint Apple Events.
+    // Cancel an in-flight export before starting the live show to avoid a
+    // second automation request waiting behind a long PDF export.
+    if (state.previewStatus === "loading") {
+      cancelPowerPointPreview();
+      powerPointPreviewGeneration += 1;
+      state.previewStatus = "idle";
+      state.previewError = null;
+    }
+    try {
+      await startPowerPointPresentation(state.deckPath, state.currentIndex + 1);
+    } catch (error) {
+      state.lastError = error instanceof Error ? error.message : String(error);
+      return broadcastState();
+    }
+  } else if (!presentationWindow || presentationWindow.isDestroyed()) {
+    state.lastError = "演示窗口尚未准备好，请重新打开演示文件。";
+    return broadcastState();
+  }
+
+  state.presenting = true;
+  state.cueVisible = true;
+  setupWindow?.hide();
+  if (state.deckType === "html" || state.deckType === "pdf") {
+    presentationWindow?.show();
+    presentationWindow?.focus();
+  }
+  cueWindow.showInactive();
+  cueWindow.moveTop();
+  if (state.deckType === "powerpoint") startPowerPointPolling();
+  return broadcastState();
+}
+
+function stopPresentation(skipPowerPointStop = false): void {
+  const wasPowerPoint = state.deckType === "powerpoint";
+  stopPowerPointPolling();
   state.presenting = false;
   state.cueVisible = false;
   presentationWindow?.hide();
   cueWindow?.hide();
+  const shouldResumePreview = wasPowerPoint &&
+    state.previewStatus === "idle" &&
+    Boolean(state.deckPath) &&
+    Boolean(powerPointPreviewDirectory);
+  if (wasPowerPoint && !skipPowerPointStop) {
+    void stopPowerPointPresentation().finally(() => {
+      if (!shouldResumePreview || !state.deckPath) return;
+      state.previewStatus = "loading";
+      state.previewError = null;
+      const generation = powerPointPreviewGeneration;
+      void preparePowerPointPreview(state.deckPath, state.slideCount, generation);
+    });
+  } else if (shouldResumePreview && state.deckPath) {
+    state.previewStatus = "loading";
+    state.previewError = null;
+    const generation = powerPointPreviewGeneration;
+    void preparePowerPointPreview(state.deckPath, state.slideCount, generation);
+  }
   if (!setupWindow || setupWindow.isDestroyed()) {
     setupWindow = createSetupWindow();
   } else {
@@ -617,17 +1182,34 @@ function registerIpcHandlers(): void {
   ipcMain.handle("state:get", () => publicState());
   ipcMain.handle("deck:choose", async () => {
     const options: OpenDialogOptions = {
-      title: "选择 HTML 演示",
+      title: "选择 HTML、PDF 或 PowerPoint 演示",
       properties: ["openFile"],
-      filters: [{ name: "HTML 演示", extensions: ["html", "htm"] }],
+      filters: [
+        { name: "支持的演示", extensions: ["html", "htm", "pdf", "pptx", "pptm", "ppsx", "ppsm"] },
+        { name: "HTML 演示", extensions: ["html", "htm"] },
+        { name: "PDF 演示", extensions: ["pdf"] },
+        { name: "PowerPoint 演示", extensions: ["pptx", "pptm", "ppsx", "ppsm"] },
+      ],
     };
     const result = setupWindow
       ? await dialog.showOpenDialog(setupWindow, options)
       : await dialog.showOpenDialog(options);
     if (result.canceled || result.filePaths.length === 0) return publicState();
-    return openDeck(result.filePaths[0]);
+    try {
+      return await openDeck(result.filePaths[0]);
+    } catch (error) {
+      state.lastError = error instanceof Error ? error.message : String(error);
+      return broadcastState();
+    }
   });
-  ipcMain.handle("deck:open", async (_event, deckPath: string) => openDeck(deckPath));
+  ipcMain.handle("deck:open", async (_event, deckPath: string) => {
+    try {
+      return await openDeck(deckPath);
+    } catch (error) {
+      state.lastError = error instanceof Error ? error.message : String(error);
+      return broadcastState();
+    }
+  });
   ipcMain.handle("notes:import", async () => {
     if (!state.deckPath) return publicState();
     const options: OpenDialogOptions = {
@@ -641,7 +1223,22 @@ function registerIpcHandlers(): void {
     if (result.canceled || result.filePaths.length === 0) return publicState();
     const imported = parseCueMarkdown(await fs.readFile(result.filePaths[0], "utf8"));
     state.notes = ensureNoteCount(imported, state.slideCount);
+    state.notesSource = "markdown";
     await writeNotes();
+    return broadcastState();
+  });
+  ipcMain.handle("notes:import-powerpoint", async () => {
+    if (!state.deckPath || state.deckType !== "powerpoint") return publicState();
+    try {
+      const imported = await readPowerPointDeck(state.deckPath);
+      state.notes = ensureNoteCount(imported.notes, imported.slideCount);
+      state.slideCount = imported.slideCount;
+      state.currentIndex = clampIndex(state.currentIndex, imported.slideCount);
+      state.notesSource = "powerpoint";
+      await writeNotes();
+    } catch (error) {
+      state.lastError = `无法重新读取 PowerPoint 备注：${error instanceof Error ? error.message : String(error)}`;
+    }
     return broadcastState();
   });
   ipcMain.handle("notes:export", async () => {
@@ -665,24 +1262,12 @@ function registerIpcHandlers(): void {
       title: String(note.title ?? ""),
       body: String(note.body ?? ""),
     }));
+    state.notesSource = "local";
     scheduleNoteSave();
     return broadcastState();
   });
   ipcMain.handle("thumbnail:get", (_event, index: number) => getSlideThumbnail(index));
-  ipcMain.handle("presentation:start", () => {
-    if (!state.deckPath || !presentationWindow) return publicState();
-    setCueWindowLocked(false);
-    if (!cueWindow || cueWindow.isDestroyed()) cueWindow = createCueWindow();
-    arrangePresentationWindows();
-    state.presenting = true;
-    state.cueVisible = true;
-    setupWindow?.hide();
-    presentationWindow.show();
-    presentationWindow.focus();
-    cueWindow.showInactive();
-    cueWindow.moveTop();
-    return broadcastState();
-  });
+  ipcMain.handle("presentation:start", () => startPresentation());
   ipcMain.handle("presentation:stop", () => {
     stopPresentation();
     return publicState();
@@ -711,7 +1296,11 @@ function registerIpcHandlers(): void {
     return publicState();
   });
   ipcMain.on("presentation:state", (event: IpcMainEvent, snapshot: PresentationSnapshot) => {
-    if (!presentationWindow || event.sender.id !== presentationWindow.webContents.id) return;
+    if (
+      !["html", "pdf"].includes(state.deckType ?? "") ||
+      !presentationWindow ||
+      event.sender.id !== presentationWindow.webContents.id
+    ) return;
     const count = Math.max(0, Number(snapshot.count) || 0);
     const recognized = Boolean(snapshot.recognized && count > 0);
     state.slideCount = count;
@@ -766,7 +1355,10 @@ app.whenReady().then(async () => {
 
 app.on("before-quit", () => {
   isQuitting = true;
+  stopPowerPointPolling();
+  if (state.presenting && state.deckType === "powerpoint") void stopPowerPointPresentation();
   resetThumbnailRenderer();
+  resetPowerPointPreview();
   globalShortcut.unregisterAll();
 });
 

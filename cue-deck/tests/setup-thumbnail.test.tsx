@@ -12,12 +12,14 @@ import type { AppState, CueDeckAPI, SlideThumbnail } from "../src/types";
 const state: AppState = {
   deckPath: "/presentations/demo.html",
   deckName: "demo.html",
+  deckType: "html",
   notesPath: "/presentations/demo.cue.md",
   notes: Array.from({ length: 3 }, (_, index) => ({
     id: `slide-${index + 1}`,
     title: `第 ${index + 1} 页`,
     body: `讲稿 ${index + 1}`,
   })),
+  notesSource: "local",
   slideCount: 3,
   currentIndex: 0,
   adapter: "frontend-slides",
@@ -27,6 +29,8 @@ const state: AppState = {
   cueLocked: false,
   fontSize: 22,
   displayCount: 1,
+  previewStatus: "ready",
+  previewError: null,
   lastError: null,
   savedAt: null,
 };
@@ -40,6 +44,7 @@ function createApi(
     chooseDeck: resolved,
     openDeck: resolved,
     importNotes: resolved,
+    importPowerPointNotes: resolved,
     exportNotes: resolved,
     updateNotes: resolved,
     getSlideThumbnail,

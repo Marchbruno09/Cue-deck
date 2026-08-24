@@ -17,6 +17,7 @@ import {
   MonitorPlay,
   Pencil,
   Plus,
+  RefreshCw,
   Save,
   ScreenShare,
   Unlock,
@@ -29,8 +30,10 @@ import type { AdapterKind, AppState, SlideNote, SlideThumbnail } from "./types";
 const emptyState: AppState = {
   deckPath: null,
   deckName: null,
+  deckType: null,
   notesPath: null,
   notes: [],
+  notesSource: null,
   slideCount: 0,
   currentIndex: 0,
   adapter: "manual",
@@ -40,6 +43,8 @@ const emptyState: AppState = {
   cueLocked: false,
   fontSize: 22,
   displayCount: 1,
+  previewStatus: "idle",
+  previewError: null,
   lastError: null,
   savedAt: null,
 };
@@ -76,6 +81,10 @@ function adapterLabel(adapter: AdapterKind): string {
       return "Reveal.js";
     case "generic":
       return "通用 HTML";
+    case "powerpoint":
+      return "Microsoft PowerPoint";
+    case "pdf":
+      return "PDF 页面";
     default:
       return "手动同步";
   }
@@ -177,7 +186,13 @@ function SetupView({ state }: { state: AppState }) {
     return () => {
       cancelled = true;
     };
-  }, [selectedIndex, state.adapterRecognized, state.deckPath, state.slideCount]);
+  }, [
+    selectedIndex,
+    state.adapterRecognized,
+    state.deckPath,
+    state.previewStatus,
+    state.slideCount,
+  ]);
 
   if (!state.deckPath) {
     return (
@@ -186,7 +201,7 @@ function SetupView({ state }: { state: AppState }) {
           <div className="brand-mark"><MonitorPlay size={24} /></div>
           <div>
             <h1>CueDeck</h1>
-            <p>私密提词 · HTML 演示</p>
+          <p>私密提词 · HTML / PDF / PowerPoint 演示</p>
           </div>
         </div>
         <button
@@ -195,7 +210,7 @@ function SetupView({ state }: { state: AppState }) {
           disabled={busy !== null}
         >
           <FolderOpen size={20} />
-          选择 HTML 演示
+          选择演示文件
         </button>
         {state.lastError && <p className="error-text">{state.lastError}</p>}
       </main>
@@ -283,6 +298,17 @@ function SetupView({ state }: { state: AppState }) {
                 <Import size={17} />
                 导入 Markdown
               </button>
+              {state.deckType === "powerpoint" && (
+                <button
+                  className="secondary-command"
+                  onClick={() => run("ppt-notes", window.cueDeck.importPowerPointNotes)}
+                  disabled={busy !== null}
+                  title="重新读取 PPT 中的 speaker notes"
+                >
+                  <RefreshCw size={16} />
+                  读取 PPT 备注
+                </button>
+              )}
               <button
                 className="icon-command"
                 onClick={() => run("export", window.cueDeck.exportNotes)}
@@ -331,22 +357,22 @@ function SetupView({ state }: { state: AppState }) {
 
             <figure className="slide-thumbnail">
               <figcaption>
-                <span><ImageIcon size={15} /> HTML 页面</span>
+                <span><ImageIcon size={15} /> 演示页面</span>
                 <strong>第 {selectedIndex + 1} 页</strong>
               </figcaption>
               <div
                 className={`slide-thumbnail-frame ${thumbnail?.status ?? "loading"}`}
                 aria-live="polite"
               >
-                {thumbnailLoading ? (
+                {thumbnailLoading || thumbnail?.status === "loading" ? (
                   <div className="thumbnail-state">
                     <LoaderCircle className="thumbnail-spinner" size={20} />
-                    <span>正在生成缩略图</span>
+                    <span>{thumbnail?.message ?? "正在生成缩略图"}</span>
                   </div>
                 ) : thumbnail?.status === "ready" && thumbnail.dataUrl ? (
                   <img
                     src={thumbnail.dataUrl}
-                    alt={`第 ${selectedIndex + 1} 页 HTML 缩略图`}
+                    alt={`第 ${selectedIndex + 1} 页 ${state.deckType === "powerpoint" ? "PowerPoint" : state.deckType === "pdf" ? "PDF" : "HTML"} 缩略图`}
                   />
                 ) : (
                   <div className="thumbnail-state">
@@ -361,17 +387,28 @@ function SetupView({ state }: { state: AppState }) {
 
         <aside className="status-pane">
           <div className="status-section">
-            <span className="eyebrow">演示识别</span>
+            <span className="eyebrow">演示同步</span>
             <strong>{adapterLabel(state.adapter)}</strong>
             <span className={`status-dot-row ${state.adapterRecognized ? "ok" : "manual"}`}>
               <span className="status-dot" />
               {state.adapterRecognized ? `${state.slideCount} 页已同步` : "手动同步模式"}
             </span>
+            {state.deckType === "powerpoint" && (
+              <span className="notes-source">
+                {state.notesSource === "powerpoint"
+                  ? "已读取 PPT speaker notes"
+                  : state.notesSource === "markdown"
+                    ? "当前使用导入的 Markdown"
+                    : "当前使用本机讲稿副本"}
+              </span>
+            )}
           </div>
           <div className="status-section">
             <span className="eyebrow">Zoom 共享窗口</span>
             <strong className="share-window-name">
-              CueDeck Presentation - {state.deckName}
+              {state.deckType === "powerpoint"
+                ? `PowerPoint Slide Show - ${state.deckName}`
+                : `CueDeck Presentation - ${state.deckName}`}
             </strong>
             <span className="privacy-state"><Lock size={15} /> 私密提词窗已保护</span>
           </div>
@@ -381,7 +418,7 @@ function SetupView({ state }: { state: AppState }) {
               <strong>{state.displayCount}</strong>
             </div>
             <div>
-              <span>HTML 页</span>
+              <span>演示页</span>
               <strong>{state.slideCount || "—"}</strong>
             </div>
             <div>
@@ -392,7 +429,7 @@ function SetupView({ state }: { state: AppState }) {
           {extraNotes > 0 && (
             <div className="mismatch-notice">
               <FileText size={17} />
-              {extraNotes} 页讲稿尚未匹配 HTML
+              {extraNotes} 页讲稿尚未匹配{state.deckType === "powerpoint" ? " PowerPoint" : state.deckType === "pdf" ? " PDF" : " HTML"}
             </div>
           )}
           <div className="status-spacer" />

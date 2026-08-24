@@ -12,8 +12,10 @@ import type { AppState, CueDeckAPI } from "../src/types";
 const baseState: AppState = {
   deckPath: "/presentations/demo.html",
   deckName: "demo.html",
+  deckType: "html",
   notesPath: "/presentations/demo.cue.md",
   notes: [{ id: "slide-1", title: "开场", body: "讲稿" }],
+  notesSource: "local",
   slideCount: 1,
   currentIndex: 0,
   adapter: "frontend-slides",
@@ -23,6 +25,8 @@ const baseState: AppState = {
   cueLocked: false,
   fontSize: 22,
   displayCount: 1,
+  previewStatus: "ready",
+  previewError: null,
   lastError: null,
   savedAt: null,
 };
@@ -43,6 +47,7 @@ describe("private cue window drag state", () => {
       chooseDeck: resolved,
       openDeck: resolved,
       importNotes: resolved,
+      importPowerPointNotes: resolved,
       exportNotes: resolved,
       updateNotes: resolved,
       getSlideThumbnail: async (index) => ({ index, status: "unavailable" }),

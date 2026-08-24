@@ -61,6 +61,10 @@ if (role === "presentation") {
   };
 
   ipcRenderer.on("presentation:probe", reportState);
+  ipcRenderer.on("presentation:activate", (_event, index: number) => {
+    activatePresentationSlide(document, index);
+    reportState();
+  });
   if (document.readyState === "loading") {
     window.addEventListener("DOMContentLoaded", startObserver, { once: true });
   } else {
@@ -80,6 +84,7 @@ if (role === "presentation") {
     chooseDeck: () => ipcRenderer.invoke("deck:choose"),
     openDeck: (path: string) => ipcRenderer.invoke("deck:open", path),
     importNotes: () => ipcRenderer.invoke("notes:import"),
+    importPowerPointNotes: () => ipcRenderer.invoke("notes:import-powerpoint"),
     exportNotes: () => ipcRenderer.invoke("notes:export"),
     updateNotes: (notes: SlideNote[]) => ipcRenderer.invoke("notes:update", notes),
     getSlideThumbnail: (index: number) => ipcRenderer.invoke("thumbnail:get", index),

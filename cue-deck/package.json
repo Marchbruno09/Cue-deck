@@ -2,27 +2,30 @@
   "name": "cue-deck",
   "version": "1.0.0",
   "private": true,
-  "description": "Private presenter notes synchronized with local HTML slide decks.",
+  "description": "Private presenter notes synchronized with local HTML and PowerPoint slide decks.",
   "main": "dist-electron/main.js",
   "scripts": {
     "dev": "electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache node ./node_modules/vite/bin/vite.js",
     "build": "node ./node_modules/typescript/bin/tsc -b && node ./node_modules/vite/bin/vite.js build",
     "test": "node ./node_modules/vitest/vitest.mjs run",
     "test:watch": "node ./node_modules/vitest/vitest.mjs",
-    "pack": "npm run build && electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_BUILDER_CACHE=${TMPDIR:-/tmp}/cue-deck-builder-cache node ./node_modules/electron-builder/cli.js --mac dir",
-    "dist": "npm run build && electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_BUILDER_CACHE=${TMPDIR:-/tmp}/cue-deck-builder-cache node ./node_modules/electron-builder/cli.js --mac zip"
+    "build:pdf-renderer": "sh scripts/build-pdf-renderer.sh",
+    "pack": "npm run build && npm run build:pdf-renderer && electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_BUILDER_CACHE=${TMPDIR:-/tmp}/cue-deck-builder-cache node ./node_modules/electron-builder/cli.js --mac dir",
+    "dist": "npm run build && npm run build:pdf-renderer && electron_config_cache=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_CACHE=${TMPDIR:-/tmp}/cue-deck-electron-cache ELECTRON_BUILDER_CACHE=${TMPDIR:-/tmp}/cue-deck-builder-cache node ./node_modules/electron-builder/cli.js --mac zip"
   },
   "dependencies": {
+    "fast-xml-parser": "^5.2.5",
     "lucide-react": "0.468.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "react-markdown": "10.1.0"
+    "react-markdown": "10.1.0",
+    "yauzl": "^2.10.0"
   },
   "devDependencies": {
+    "@types/jsdom": "28.0.3",
     "@types/node": "22.15.30",
     "@types/react": "19.1.8",
     "@types/react-dom": "19.1.6",
-    "@types/jsdom": "28.0.3",
     "@vitejs/plugin-react": "5.0.4",
     "electron": "41.7.1",
     "electron-builder": "26.15.3",
@@ -46,19 +49,32 @@
       "dist-electron/**/*",
       "package.json"
     ],
+    "extraResources": [
+      {
+        "from": "build/cue-deck-pdf-renderer",
+        "to": "bin/cue-deck-pdf-renderer"
+      }
+    ],
     "mac": {
       "category": "public.app-category.productivity",
       "target": [
         {
           "target": "dir",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         },
         {
           "target": "zip",
-          "arch": ["arm64"]
+          "arch": [
+            "arm64"
+          ]
         }
       ],
-      "identity": null
+      "identity": null,
+      "extendInfo": {
+        "NSAppleEventsUsageDescription": "CueDeck uses Microsoft PowerPoint to present slides and generate local slide previews."
+      }
     },
     "directories": {
       "output": "release"

@@ -20,8 +20,10 @@ export function installBrowserMock(): void {
   let state: AppState = {
     deckPath: "/Users/admin/Documents/Demo/aramco-ventures.html",
     deckName: "aramco-ventures.html",
+    deckType: "html",
     notesPath: "/Users/admin/Documents/Demo/aramco-ventures.cue.md",
     notes: sampleNotes,
+    notesSource: "local",
     slideCount: 5,
     currentIndex: 0,
     adapter: "frontend-slides",
@@ -31,6 +33,8 @@ export function installBrowserMock(): void {
     cueLocked: false,
     fontSize: 22,
     displayCount: 2,
+    previewStatus: "ready",
+    previewError: null,
     lastError: null,
     savedAt: new Date().toISOString(),
   };
@@ -48,6 +52,7 @@ export function installBrowserMock(): void {
     chooseDeck: resolved,
     openDeck: resolved,
     importNotes: resolved,
+    importPowerPointNotes: resolved,
     exportNotes: resolved,
     updateNotes: (notes) => Promise.resolve(update({ notes, savedAt: new Date().toISOString() })),
     getSlideThumbnail: (index) => Promise.resolve({

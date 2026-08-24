@@ -1,4 +1,7 @@
-export type AdapterKind = "frontend-slides" | "reveal" | "generic" | "manual";
+export type DeckType = "html" | "powerpoint" | "pdf";
+export type AdapterKind = "frontend-slides" | "reveal" | "generic" | "powerpoint" | "pdf" | "manual";
+export type DeckPreviewStatus = "idle" | "loading" | "ready" | "error";
+export type NotesSource = "local" | "markdown" | "powerpoint" | null;
 
 export interface SlideNote {
   id: string;
@@ -16,8 +19,10 @@ export interface WindowBounds {
 export interface AppState {
   deckPath: string | null;
   deckName: string | null;
+  deckType: DeckType | null;
   notesPath: string | null;
   notes: SlideNote[];
+  notesSource: NotesSource;
   slideCount: number;
   currentIndex: number;
   adapter: AdapterKind;
@@ -27,6 +32,8 @@ export interface AppState {
   cueLocked: boolean;
   fontSize: number;
   displayCount: number;
+  previewStatus: DeckPreviewStatus;
+  previewError: string | null;
   lastError: string | null;
   savedAt: string | null;
 }
@@ -38,7 +45,7 @@ export interface PresentationSnapshot {
   recognized: boolean;
 }
 
-export type SlideThumbnailStatus = "ready" | "unavailable" | "error";
+export type SlideThumbnailStatus = "loading" | "ready" | "unavailable" | "error";
 
 export interface SlideThumbnail {
   index: number;
@@ -60,6 +67,7 @@ export interface CueDeckAPI {
   chooseDeck(): Promise<AppState>;
   openDeck(path: string): Promise<AppState>;
   importNotes(): Promise<AppState>;
+  importPowerPointNotes(): Promise<AppState>;
   exportNotes(): Promise<AppState>;
   updateNotes(notes: SlideNote[]): Promise<AppState>;
   getSlideThumbnail(index: number): Promise<SlideThumbnail>;
