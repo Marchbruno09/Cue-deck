@@ -1,3 +1,0 @@
-# 01_boss_ai_continuous_management
-
-Boss AI belongs in a different category from task-oriented executive assistants. Hermes and OpenClaw help an executive ask questions and complete discrete tasks, whereas Boss AI continuously senses how the enterprise is changing and turns that understanding into management follow-through. The stack starts with Ontology, builds a persistent Wiki Brain, converts management judgment into decision and action, and exposes the system through GUI and dialogue at the CEO interface; Enterprise Engineering and Service governs the full production environment around it. The value is therefore not merely more completed tasks, but better decisions, stronger business follow-through, and continuous improvement.
