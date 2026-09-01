@@ -1,17 +1,25 @@
 # CueDeck
 
-CueDeck 是一个只在 Mac 本机运行的 HTML / PDF / PowerPoint 演示提词工具。它把演示和讲稿放在独立窗口中，让 Zoom 只共享演示内容。
+CueDeck 是一个只在 Mac 本机运行的 HTML / 本地网页 URL / PDF / PowerPoint 演示提词工具。它把演示和讲稿放在独立窗口中，让 Zoom 只共享演示内容。
 
 ## 使用
 
-1. 打开 `CueDeck.app`，选择 HTML、PDF 或现代 PowerPoint 演示文件。
+1. 打开 `CueDeck.app`，选择 HTML、PDF、现代 PowerPoint 演示文件，或连接本地网页 URL。
 2. 直接逐页编写讲稿，或导入 Markdown。PowerPoint 会在首次导入时自动读取每页 speaker notes。
 3. 点击“开始演示”。
-4. 在 Zoom 中，HTML 只共享标题以 `CueDeck Presentation -` 开头的窗口；PowerPoint 只共享其 Slide Show 窗口。
+4. 在 Zoom 中，HTML 和本地网页只共享标题以 `CueDeck Presentation -` 开头的窗口；PowerPoint 只共享其 Slide Show 窗口。
 5. 点击提词卡正文、下一步按钮、空格或右方向键继续；左方向键返回。
 6. `Command+Shift+H` 可立即隐藏或恢复提词卡。
 
 不要在提词卡可见时共享“整个桌面”或“屏幕区域”。macOS 26 无法保证任意悬浮窗在整屏共享中被可靠排除。
+
+## 本地网页 URL
+
+- 在空白页点击“连接本地网页”，粘贴 `http://localhost`、`http://127.0.0.1` 或 `http://[::1]` 地址。
+- CueDeck 会在可共享的演示窗口中加载真实网页，不会把页面转换成图片；网页中的按钮、输入框、滚动和其他点击操作仍然可用。
+- 提词卡继续使用 `.cue.md` 讲稿，URL 演示的讲稿副本保存在 CueDeck 的本机数据目录，也可以导出 Markdown。
+- CueDeck 会向网页窗口发送左右方向键。支持标准 `.slide`、Reveal.js、`data-slide` 页面，以及 Bel Ontology Playground 的场景 URL。
+- 本地网页服务必须在演示期间保持运行；CueDeck 只允许回环地址，避免把任意远程网页作为演示源加载。
 
 ## Markdown 格式
 

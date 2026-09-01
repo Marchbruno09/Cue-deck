@@ -10,54 +10,46 @@ import type { AppState, CueDeckAPI } from "../src/types";
   .IS_REACT_ACT_ENVIRONMENT = true;
 
 const state: AppState = {
-  deckPath: "/presentations/quarterly-review.pptx",
-  deckName: "quarterly-review.pptx",
-  deckType: "powerpoint",
-  notesPath: "/presentations/quarterly-review.cue.md",
-  notes: [{ id: "slide-1", title: "Opening", body: "Speaker note" }],
-  notesSource: "powerpoint",
-  slideCount: 1,
+  deckPath: null,
+  deckName: null,
+  deckType: null,
+  notesPath: null,
+  notes: [],
+  notesSource: null,
+  slideCount: 0,
   currentIndex: 0,
-  adapter: "powerpoint",
-  adapterRecognized: true,
+  adapter: "manual",
+  adapterRecognized: false,
   presenting: false,
   cueVisible: false,
   cueLocked: false,
   fontSize: 22,
   displayCount: 1,
-  previewStatus: "loading",
+  previewStatus: "idle",
   previewError: null,
   lastError: null,
   savedAt: null,
 };
 
-describe("PowerPoint setup workspace", () => {
+describe("local URL setup", () => {
   let container: HTMLDivElement;
   let root: Root | undefined;
-  let importPowerPointNotes: ReturnType<typeof vi.fn>;
+  let openUrl: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     window.history.replaceState({}, "", "/?view=setup");
-    Object.defineProperty(Element.prototype, "scrollIntoView", {
-      configurable: true,
-      value: vi.fn(),
-    });
-    importPowerPointNotes = vi.fn(async () => state);
+    openUrl = vi.fn(async () => state);
     const resolved = async () => state;
     const api: CueDeckAPI = {
       getState: resolved,
       chooseDeck: resolved,
       openDeck: resolved,
-      openUrl: resolved,
+      openUrl,
       importNotes: resolved,
-      importPowerPointNotes,
+      importPowerPointNotes: resolved,
       exportNotes: resolved,
       updateNotes: resolved,
-      getSlideThumbnail: async (index) => ({
-        index,
-        status: "loading",
-        message: "正在通过 PowerPoint 生成缩略图",
-      }),
+      getSlideThumbnail: async (index) => ({ index, status: "unavailable" }),
       startPresentation: resolved,
       stopPresentation: resolved,
       navigate: resolved,
@@ -69,7 +61,6 @@ describe("PowerPoint setup workspace", () => {
       onState: () => () => undefined,
     };
     window.cueDeck = api;
-
     container = document.createElement("div");
     document.body.append(container);
     root = createRoot(container);
@@ -80,21 +71,25 @@ describe("PowerPoint setup workspace", () => {
     container.remove();
   });
 
-  it("shows PPT notes, sharing guidance and preview progress", async () => {
+  it("opens the local URL dialog and submits its URL to the main process", async () => {
     await act(async () => {
       root?.render(<App />);
       await Promise.resolve();
+    });
+
+    const connectButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("连接本地网页"));
+    expect(connectButton).toBeDefined();
+
+    await act(async () => connectButton?.click());
+    const form = container.querySelector<HTMLFormElement>(".url-dialog");
+    expect(form).not.toBeNull();
+
+    await act(async () => {
+      form?.dispatchEvent(new Event("submit", { bubbles: true, cancelable: true }));
       await Promise.resolve();
     });
 
-    expect(container.textContent).toContain("已读取 PPT speaker notes");
-    expect(container.textContent).toContain("PowerPoint Slide Show - quarterly-review.pptx");
-    expect(container.textContent).toContain("正在通过 PowerPoint 生成缩略图");
-
-    const refreshButton = Array.from(container.querySelectorAll("button"))
-      .find((button) => button.textContent?.includes("读取 PPT 备注"));
-    expect(refreshButton).toBeDefined();
-    await act(async () => refreshButton?.dispatchEvent(new MouseEvent("click", { bubbles: true })));
-    expect(importPowerPointNotes).toHaveBeenCalledOnce();
+    expect(openUrl).toHaveBeenCalledWith("http://127.0.0.1:4174/");
   });
 });

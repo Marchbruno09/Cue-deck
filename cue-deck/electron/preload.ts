@@ -83,6 +83,7 @@ if (role === "presentation") {
     getState: () => ipcRenderer.invoke("state:get"),
     chooseDeck: () => ipcRenderer.invoke("deck:choose"),
     openDeck: (path: string) => ipcRenderer.invoke("deck:open", path),
+    openUrl: (url: string) => ipcRenderer.invoke("deck:open-url", url),
     importNotes: () => ipcRenderer.invoke("notes:import"),
     importPowerPointNotes: () => ipcRenderer.invoke("notes:import-powerpoint"),
     exportNotes: () => ipcRenderer.invoke("notes:export"),

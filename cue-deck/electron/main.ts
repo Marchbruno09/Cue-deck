@@ -52,6 +52,7 @@ const preloadPath = path.join(moduleDirectory, "preload.js");
 const developmentServerUrl = process.env.VITE_DEV_SERVER_URL;
 const powerPointExtensions = new Set([".pptx", ".pptm", ".ppsx", ".ppsm"]);
 const pdfExtensions = new Set([".pdf"]);
+const loopbackHostnames = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 interface Settings {
   lastDeckPath: string | null;
@@ -176,11 +177,56 @@ function rememberProgress(): void {
 }
 
 function notesPathForDeck(deckPath: string): string {
+  if (isLocalUrl(deckPath)) return notesPathForUrl(deckPath);
   const extension = path.extname(deckPath);
   return path.join(
     path.dirname(deckPath),
     `${path.basename(deckPath, extension)}.cue.md`,
   );
+}
+
+function isUrlCandidate(source: string): boolean {
+  return /^[a-z][a-z\d+.-]*:\/\//i.test(source.trim());
+}
+
+function parseLocalUrl(source: string): URL {
+  let url: URL;
+  try {
+    url = new URL(source.trim());
+  } catch {
+    throw new Error("请输入有效的本地网页 URL。");
+  }
+
+  if (!(["http:", "https:"].includes(url.protocol))) {
+    throw new Error("本地网页只支持 http:// 或 https:// 地址。");
+  }
+  if (!loopbackHostnames.has(url.hostname.toLowerCase())) {
+    throw new Error("为保护演示内容，本地网页只允许 localhost、127.0.0.1 或 ::1。");
+  }
+  return url;
+}
+
+function isLocalUrl(source: string): boolean {
+  if (!isUrlCandidate(source)) return false;
+  try {
+    parseLocalUrl(source);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function notesPathForUrl(deckUrl: string): string {
+  const url = parseLocalUrl(deckUrl);
+  const cacheKey = createHash("sha256").update(url.toString()).digest("hex").slice(0, 20);
+  const label = path.basename(url.pathname) || url.hostname.replaceAll(".", "-");
+  const safeLabel = label.replace(/[^a-zA-Z0-9._-]+/g, "-").slice(0, 80) || "local-web";
+  return path.join(app.getPath("userData"), "url-notes", `${safeLabel}-${cacheKey}.cue.md`);
+}
+
+function deckNameForUrl(deckUrl: string): string {
+  const url = parseLocalUrl(deckUrl);
+  return path.basename(url.pathname) || `${url.hostname}${url.port ? `:${url.port}` : ""}`;
 }
 
 async function pathExists(filePath: string): Promise<boolean> {
@@ -306,6 +352,15 @@ function createSetupWindow(): BrowserWindow {
 
 function attachSafeNavigation(window: BrowserWindow): void {
   window.webContents.setWindowOpenHandler(({ url }) => {
+    if (isLocalUrl(url)) {
+      // Keep links opened with target="_blank" inside the shared presentation
+      // window so local apps remain interactive during the demo.
+      void window.loadURL(url).catch((error) => {
+        state.lastError = `无法打开本地网页：${String(error)}`;
+        broadcastState();
+      });
+      return { action: "deny" };
+    }
     if (url.startsWith("https://") || url.startsWith("http://")) {
       void shell.openExternal(url);
     }
@@ -334,6 +389,10 @@ function createPresentationWindow(): BrowserWindow {
   });
 
   attachSafeNavigation(window);
+  // Keep the presentation available to macOS window-share pickers. The cue
+  // window is intentionally protected, while the presentation must remain
+  // capturable by Google Meet and other conferencing apps.
+  window.setContentProtection(false);
   window.on("close", (event) => {
     if (!isQuitting) {
       event.preventDefault();
@@ -589,7 +648,11 @@ async function ensureThumbnailWindow(deckPath: string): Promise<BrowserWindow> {
   thumbnailWindow = window;
   thumbnailDeckPath = deckPath;
   try {
-    await window.loadFile(deckPath);
+    if (isLocalUrl(deckPath)) {
+      await window.loadURL(deckPath);
+    } else {
+      await window.loadFile(deckPath);
+    }
     return window;
   } catch (error) {
     if (!window.isDestroyed()) window.destroy();
@@ -816,6 +879,15 @@ function arrangePresentationWindows(): void {
   if (presentationWindow) {
     presentationWindow.setBounds(presentationDisplay.bounds, false);
     presentationWindow.setAlwaysOnTop(false);
+    // Google Meet may enumerate only windows in the current Space. The
+    // presentation can live on a secondary display, so keep it discoverable
+    // while it is being presented without changing its stacking order.
+    if (!presentationWindow.isVisibleOnAllWorkspaces()) {
+      presentationWindow.setVisibleOnAllWorkspaces(true, {
+        visibleOnFullScreen: true,
+        skipTransformProcessType: true,
+      });
+    }
   }
 
   if (!settings.cueBounds || !validBounds(settings.cueBounds, 340, 220)) {
@@ -829,6 +901,50 @@ function arrangePresentationWindows(): void {
     });
   }
   cueWindow.setAlwaysOnTop(true, "floating");
+}
+
+async function openUrlDeck(deckUrl: string): Promise<AppState> {
+  const normalizedUrl = parseLocalUrl(deckUrl).toString();
+  const sidecarPath = notesPathForUrl(normalizedUrl);
+  const sidecarExists = await pathExists(sidecarPath);
+  const notes = await readNotesFile(sidecarPath);
+
+  state = {
+    ...state,
+    deckPath: normalizedUrl,
+    deckName: deckNameForUrl(normalizedUrl),
+    deckType: "url",
+    notesPath: sidecarPath,
+    notes,
+    notesSource: sidecarExists ? "local" : null,
+    slideCount: 0,
+    currentIndex: settings.progressByDeck[normalizedUrl] ?? 0,
+    adapter: "manual",
+    adapterRecognized: false,
+    previewStatus: "ready",
+    previewError: null,
+    lastError: null,
+    savedAt: null,
+  };
+  settings.lastDeckPath = normalizedUrl;
+  scheduleSettingsSave();
+  resetThumbnailRenderer();
+  resetPowerPointPreview();
+  resetPdfPreview();
+
+  if (presentationWindow && !presentationWindow.isDestroyed()) {
+    presentationWindow.destroy();
+  }
+  presentationWindow = createPresentationWindow();
+  presentationWindow.setTitle(`CueDeck Presentation - ${deckNameForUrl(normalizedUrl)}`);
+
+  try {
+    await presentationWindow.loadURL(normalizedUrl);
+    presentationWindow.webContents.send("presentation:probe");
+  } catch (error) {
+    state.lastError = `无法打开本地网页：${String(error)}`;
+  }
+  return broadcastState();
 }
 
 async function openHtmlDeck(deckPath: string): Promise<AppState> {
@@ -1006,6 +1122,7 @@ async function openPdfDeck(deckPath: string): Promise<AppState> {
 }
 
 async function openDeck(deckPath: string): Promise<AppState> {
+  if (isUrlCandidate(deckPath)) return openUrlDeck(deckPath);
   const extension = path.extname(deckPath).toLowerCase();
   await fs.access(deckPath);
   if ([".html", ".htm"].includes(extension)) return openHtmlDeck(deckPath);
@@ -1113,9 +1230,12 @@ async function startPresentation(): Promise<AppState> {
   state.presenting = true;
   state.cueVisible = true;
   setupWindow?.hide();
-  if (state.deckType === "html" || state.deckType === "pdf") {
+  if (state.deckType === "html" || state.deckType === "url" || state.deckType === "pdf") {
     presentationWindow?.show();
     presentationWindow?.focus();
+    if (state.deckType === "url") {
+      presentationWindow?.webContents.send("presentation:activate", state.currentIndex);
+    }
   }
   cueWindow.showInactive();
   cueWindow.moveTop();
@@ -1210,6 +1330,14 @@ function registerIpcHandlers(): void {
       return broadcastState();
     }
   });
+  ipcMain.handle("deck:open-url", async (_event, deckUrl: string) => {
+    try {
+      return await openUrlDeck(deckUrl);
+    } catch (error) {
+      state.lastError = error instanceof Error ? error.message : String(error);
+      return broadcastState();
+    }
+  });
   ipcMain.handle("notes:import", async () => {
     if (!state.deckPath) return publicState();
     const options: OpenDialogOptions = {
@@ -1297,7 +1425,7 @@ function registerIpcHandlers(): void {
   });
   ipcMain.on("presentation:state", (event: IpcMainEvent, snapshot: PresentationSnapshot) => {
     if (
-      !["html", "pdf"].includes(state.deckType ?? "") ||
+      !["html", "url", "pdf"].includes(state.deckType ?? "") ||
       !presentationWindow ||
       event.sender.id !== presentationWindow.webContents.id
     ) return;

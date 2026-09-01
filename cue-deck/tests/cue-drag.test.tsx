@@ -46,6 +46,7 @@ describe("private cue window drag state", () => {
       getState: resolved,
       chooseDeck: resolved,
       openDeck: resolved,
+      openUrl: resolved,
       importNotes: resolved,
       importPowerPointNotes: resolved,
       exportNotes: resolved,

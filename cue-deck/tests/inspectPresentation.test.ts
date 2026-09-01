@@ -6,7 +6,9 @@ import {
 } from "../src/lib/inspectPresentation";
 
 function documentFor(html: string): Document {
-  return new JSDOM(html).window.document;
+  return new JSDOM(html, {
+    url: "http://127.0.0.1:4174/prototypes/demo.html?scene=7",
+  }).window.document;
 }
 
 describe("presentation inspection", () => {
@@ -63,6 +65,23 @@ describe("presentation inspection", () => {
       adapter: "generic",
       recognized: true,
     });
+  });
+
+  it("recognizes the Bel ontology scene route and its eight navigable scenes", () => {
+    const document = documentFor(`
+      <body data-page="bel-ontology-playground">
+        <div class="bel-agent-root" data-scene="7"></div>
+      </body>
+    `);
+    expect(inspectPresentation(document)).toEqual({
+      index: 6,
+      count: 8,
+      adapter: "bel",
+      recognized: true,
+    });
+
+    activatePresentationSlide(document, 7);
+    expect(new URL(document.defaultView!.location.href).searchParams.get("scene")).toBe("9");
   });
 
   it("detects and activates generated PDF pages", () => {

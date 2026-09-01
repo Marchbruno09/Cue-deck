@@ -2,6 +2,7 @@ import type { PresentationSnapshot } from "../types";
 
 const priorityClasses = ["active", "present", "is-active", "current", "visible"];
 const revealStateClasses = ["past", "present", "future"];
+const belSceneIds = [1, 2, 3, 4, 5, 6, 7, 9] as const;
 
 function visibleSlideIndex(slides: Element[]): number {
   for (const className of priorityClasses) {
@@ -26,7 +27,27 @@ function revealSlides(document: Document): Element[] {
   return flattened;
 }
 
+function belSceneIndex(document: Document): number | null {
+  const root = document.querySelector<HTMLElement>(".bel-agent-root[data-scene]");
+  if (!root) return null;
+
+  const scene = Number(root.dataset.scene);
+  if (scene === 8) return belSceneIds.indexOf(7);
+  const index = belSceneIds.indexOf(scene as (typeof belSceneIds)[number]);
+  return index >= 0 ? index : 0;
+}
+
 export function inspectPresentation(document: Document): PresentationSnapshot {
+  const belIndex = belSceneIndex(document);
+  if (belIndex !== null) {
+    return {
+      index: belIndex,
+      count: belSceneIds.length,
+      adapter: "bel",
+      recognized: true,
+    };
+  }
+
   const revealRoot = document.querySelector(".reveal .slides");
   if (revealRoot) {
     const flattened = revealSlides(document);
@@ -165,6 +186,16 @@ export function activatePresentationSlide(
     setFlatSlideState(Array.from(document.querySelectorAll("[data-cue-pdf-slide]")), targetIndex, "active");
   } else if (before.adapter === "frontend-slides") {
     setFlatSlideState(Array.from(document.querySelectorAll(".slide")), targetIndex, "active");
+  } else if (before.adapter === "bel") {
+    const sceneId = belSceneIds[targetIndex] ?? belSceneIds[0];
+    const view = document.defaultView;
+    if (view) {
+      const url = new URL(view.location.href);
+      url.searchParams.set("scene", String(sceneId));
+      const nextUrl = `${url.pathname}${url.search}${url.hash}`;
+      view.history.replaceState(view.history.state, "", nextUrl);
+      view.dispatchEvent(new view.PopStateEvent("popstate"));
+    }
   } else if (before.adapter === "generic") {
     setFlatSlideState(
       Array.from(document.querySelectorAll("[data-slide], [data-slide-index]")),

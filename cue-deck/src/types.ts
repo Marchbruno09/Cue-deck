@@ -1,5 +1,5 @@
-export type DeckType = "html" | "powerpoint" | "pdf";
-export type AdapterKind = "frontend-slides" | "reveal" | "generic" | "powerpoint" | "pdf" | "manual";
+export type DeckType = "html" | "url" | "powerpoint" | "pdf";
+export type AdapterKind = "frontend-slides" | "reveal" | "generic" | "bel" | "powerpoint" | "pdf" | "manual";
 export type DeckPreviewStatus = "idle" | "loading" | "ready" | "error";
 export type NotesSource = "local" | "markdown" | "powerpoint" | null;
 
@@ -66,6 +66,7 @@ export interface CueDeckAPI {
   getState(): Promise<AppState>;
   chooseDeck(): Promise<AppState>;
   openDeck(path: string): Promise<AppState>;
+  openUrl(url: string): Promise<AppState>;
   importNotes(): Promise<AppState>;
   importPowerPointNotes(): Promise<AppState>;
   exportNotes(): Promise<AppState>;

@@ -8,6 +8,7 @@ import {
   EyeOff,
   FileText,
   FolderOpen,
+  Globe2,
   GripVertical,
   Image as ImageIcon,
   Import,
@@ -81,12 +82,27 @@ function adapterLabel(adapter: AdapterKind): string {
       return "Reveal.js";
     case "generic":
       return "通用 HTML";
+    case "bel":
+      return "Bel 场景同步";
     case "powerpoint":
       return "Microsoft PowerPoint";
     case "pdf":
       return "PDF 页面";
     default:
       return "手动同步";
+  }
+}
+
+function deckTypeLabel(deckType: AppState["deckType"]): string {
+  switch (deckType) {
+    case "url":
+      return "本地网页";
+    case "powerpoint":
+      return "PowerPoint";
+    case "pdf":
+      return "PDF";
+    default:
+      return "HTML";
   }
 }
 
@@ -99,12 +115,91 @@ function savedLabel(savedAt: string | null): string {
   return `${time} 已保存`;
 }
 
+function LocalUrlDialog({
+  open,
+  busy,
+  error,
+  onClose,
+  onSubmit,
+}: {
+  open: boolean;
+  busy: boolean;
+  error: string | null;
+  onClose: () => void;
+  onSubmit: (url: string) => void;
+}) {
+  const [draft, setDraft] = useState("http://127.0.0.1:4174/");
+
+  useEffect(() => {
+    if (open) setDraft("http://127.0.0.1:4174/");
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !busy) onClose();
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [busy, onClose, open]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="url-dialog-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget && !busy) onClose();
+      }}
+    >
+      <form
+        className="url-dialog"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSubmit(draft);
+        }}
+      >
+        <div className="url-dialog-heading">
+          <div className="url-dialog-icon"><Globe2 size={20} /></div>
+          <div>
+            <h2>连接本地网页</h2>
+            <p>网页会在 CueDeck 的演示窗口中运行，页面内的点击和输入仍然可用。</p>
+          </div>
+        </div>
+        <label className="field-label" htmlFor="local-url">本地网页 URL</label>
+        <input
+          id="local-url"
+          className="url-input"
+          value={draft}
+          onChange={(event) => setDraft(event.target.value)}
+          placeholder="http://127.0.0.1:4174/prototypes/demo.html"
+          autoFocus
+          spellCheck={false}
+          disabled={busy}
+        />
+        <p className="url-dialog-hint">仅允许 localhost、127.0.0.1 或 ::1 地址。</p>
+        {error && <p className="url-dialog-error">{error}</p>}
+        <div className="url-dialog-actions">
+          <button type="button" className="secondary-command" onClick={onClose} disabled={busy}>取消</button>
+          <button type="submit" className="primary-command" disabled={busy || !draft.trim()}>
+            {busy ? <LoaderCircle className="thumbnail-spinner" size={16} /> : <Globe2 size={16} />}
+            {busy ? "正在连接" : "连接网页"}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
+
 function SetupView({ state }: { state: AppState }) {
   const [draftNotes, setDraftNotes] = useState<SlideNote[]>(state.notes);
   const [selectedIndex, setSelectedIndex] = useState(state.currentIndex);
   const [busy, setBusy] = useState<string | null>(null);
   const [thumbnail, setThumbnail] = useState<SlideThumbnail | null>(null);
   const [thumbnailLoading, setThumbnailLoading] = useState(false);
+  const [urlDialogOpen, setUrlDialogOpen] = useState(false);
+  const [urlError, setUrlError] = useState<string | null>(null);
   const saveTimer = useRef<number | null>(null);
   const thumbnailRequest = useRef(0);
   const selectedRowRef = useRef<HTMLButtonElement | null>(null);
@@ -126,6 +221,21 @@ function SetupView({ state }: { state: AppState }) {
     setBusy(label);
     try {
       await operation();
+    } finally {
+      setBusy(null);
+    }
+  }, []);
+
+  const connectUrl = useCallback(async (url: string) => {
+    setBusy("url");
+    setUrlError(null);
+    try {
+      const nextState = await window.cueDeck.openUrl(url);
+      if (nextState.lastError) {
+        setUrlError(nextState.lastError);
+        return;
+      }
+      setUrlDialogOpen(false);
     } finally {
       setBusy(null);
     }
@@ -196,24 +306,43 @@ function SetupView({ state }: { state: AppState }) {
 
   if (!state.deckPath) {
     return (
-      <main className="empty-shell">
-        <div className="brand-lockup">
-          <div className="brand-mark"><MonitorPlay size={24} /></div>
-          <div>
-            <h1>CueDeck</h1>
-          <p>私密提词 · HTML / PDF / PowerPoint 演示</p>
+      <>
+        <main className="empty-shell">
+          <div className="brand-lockup">
+            <div className="brand-mark"><MonitorPlay size={24} /></div>
+            <div>
+              <h1>CueDeck</h1>
+              <p>私密提词 · HTML / 本地网页 / PDF / PowerPoint</p>
+            </div>
           </div>
-        </div>
-        <button
-          className="primary-command large-command"
-          onClick={() => run("open", window.cueDeck.chooseDeck)}
-          disabled={busy !== null}
-        >
-          <FolderOpen size={20} />
-          选择演示文件
-        </button>
-        {state.lastError && <p className="error-text">{state.lastError}</p>}
-      </main>
+          <div className="empty-actions">
+            <button
+              className="primary-command large-command"
+              onClick={() => run("open", window.cueDeck.chooseDeck)}
+              disabled={busy !== null}
+            >
+              <FolderOpen size={20} />
+              选择演示文件
+            </button>
+            <button
+              className="secondary-command large-command"
+              onClick={() => { setUrlError(null); setUrlDialogOpen(true); }}
+              disabled={busy !== null}
+            >
+              <Globe2 size={20} />
+              连接本地网页
+            </button>
+          </div>
+          {state.lastError && <p className="error-text">{state.lastError}</p>}
+        </main>
+        <LocalUrlDialog
+          open={urlDialogOpen}
+          busy={busy === "url"}
+          error={urlError}
+          onClose={() => setUrlDialogOpen(false)}
+          onSubmit={connectUrl}
+        />
+      </>
     );
   }
 
@@ -239,6 +368,14 @@ function SetupView({ state }: { state: AppState }) {
           >
             <FolderOpen size={17} />
             更换演示
+          </button>
+          <button
+            className="secondary-command"
+            onClick={() => { setUrlError(null); setUrlDialogOpen(true); }}
+            disabled={busy !== null}
+          >
+            <Globe2 size={17} />
+            连接网页
           </button>
           <button
             className="primary-command"
@@ -372,7 +509,7 @@ function SetupView({ state }: { state: AppState }) {
                 ) : thumbnail?.status === "ready" && thumbnail.dataUrl ? (
                   <img
                     src={thumbnail.dataUrl}
-                    alt={`第 ${selectedIndex + 1} 页 ${state.deckType === "powerpoint" ? "PowerPoint" : state.deckType === "pdf" ? "PDF" : "HTML"} 缩略图`}
+                    alt={`第 ${selectedIndex + 1} 页 ${deckTypeLabel(state.deckType)} 缩略图`}
                   />
                 ) : (
                   <div className="thumbnail-state">
@@ -412,6 +549,12 @@ function SetupView({ state }: { state: AppState }) {
             </strong>
             <span className="privacy-state"><Lock size={15} /> 私密提词窗已保护</span>
           </div>
+          {state.deckType === "url" && (
+            <div className="status-section">
+              <span className="eyebrow">本地网页地址</span>
+              <code className="source-url" title={state.deckPath ?? undefined}>{state.deckPath}</code>
+            </div>
+          )}
           <div className="status-section metrics">
             <div>
               <span>屏幕</span>
@@ -429,7 +572,7 @@ function SetupView({ state }: { state: AppState }) {
           {extraNotes > 0 && (
             <div className="mismatch-notice">
               <FileText size={17} />
-              {extraNotes} 页讲稿尚未匹配{state.deckType === "powerpoint" ? " PowerPoint" : state.deckType === "pdf" ? " PDF" : " HTML"}
+              {extraNotes} 页讲稿尚未匹配 {deckTypeLabel(state.deckType)}
             </div>
           )}
           <div className="status-spacer" />
@@ -438,6 +581,13 @@ function SetupView({ state }: { state: AppState }) {
           </p>
         </aside>
       </section>
+      <LocalUrlDialog
+        open={urlDialogOpen}
+        busy={busy === "url"}
+        error={urlError}
+        onClose={() => setUrlDialogOpen(false)}
+        onSubmit={connectUrl}
+      />
     </main>
   );
 }
